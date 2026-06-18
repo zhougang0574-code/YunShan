@@ -1,0 +1,10 @@
+akshare
+pandas
+numpy
+pyarrow
+streamlit
+plotly
+fastapi
+uvicorn
+httpx
+pytest

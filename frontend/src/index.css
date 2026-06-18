@@ -1,0 +1,204 @@
+:root {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: #1f2933;
+  background: #f5f7fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  padding: 20px;
+  background: #fff;
+  border-right: 1px solid #e4e7eb;
+}
+
+.main {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-x: hidden;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0 0 16px;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  color: #52606d;
+  margin: 12px 0 4px;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+button {
+  width: 100%;
+  margin-top: 16px;
+  padding: 9px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #9fb3d8;
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: #fff;
+  color: #2563eb;
+  border: 1px solid #2563eb;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.card .label {
+  font-size: 12px;
+  color: #7b8794;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.card .value {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.rating-good {
+  color: #c0392b;
+}
+.rating-bad {
+  color: #14794a;
+}
+.rating-ok {
+  color: #b7791f;
+}
+.rating-neutral {
+  color: #1f2933;
+}
+
+.badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badge-good {
+  background: #fce8e6;
+  color: #c0392b;
+}
+.badge-ok {
+  background: #fdf3d8;
+  color: #b7791f;
+}
+.badge-bad {
+  background: #e3f4ec;
+  color: #14794a;
+}
+.badge-neutral {
+  background: #eef1f4;
+  color: #52606d;
+}
+
+.card .note {
+  font-size: 12px;
+  color: #7b8794;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #cbd2d9;
+  color: #fff;
+  font-size: 10px;
+  cursor: help;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #eef1f4;
+  padding: 6px 8px;
+  text-align: right;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+.error {
+  background: #fdecea;
+  color: #c0392b;
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.muted {
+  color: #7b8794;
+}
