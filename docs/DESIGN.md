@@ -5,8 +5,9 @@
 YunShan 是一款**研究型 A 股量化回测系统**（后续扩展美股），目标是做出一款能力优秀、前后端分离的系统，把「数据 → 因子/策略 → 回测 → 业绩分析 → 可视化」这条链路做到扎实、可复用、可扩展。
 
 定位与边界（本阶段明确不做）：
-- **纯研究回测，不碰实盘**：不设计行情推送、订单管理、实时风控、券商接口、资金安全等模块。架构会为未来扩展预留接口，但本阶段不实现。
+- **纯研究回测，不碰实盘**：不设计订单管理、实时风控、券商接口、资金安全等模块。架构会为未来扩展预留接口，但本阶段不实现。
 - **单用户**：不做多用户/登录鉴权/数据隔离，本地或单人部署即可。
+- **选股辅助允许轻量"近实时"报价，但不是行情推送系统**：为方便选股时看走势，提供基于**轮询**（非 WebSocket 长连接推送）的近实时报价与技术信号提示，刷新间隔分钟级即可，不追求 tick 级实时，不涉及下单/撮合/风控。
 
 技术总基调：
 - **后端 Python（FastAPI）**：与核心计算库同语言，API 层可直接函数调用计算层，复用 akshare / pandas / numpy 生态，无跨语言集成成本。
@@ -28,10 +29,16 @@ YunShan/
 │   │   ├── fetcher.py             # 数据源适配（akshare A股；预留 yfinance 美股）
 │   │   ├── storage.py             # 本地存储（DuckDB/Parquet），范围感知 + 增量更新
 │   │   ├── calendar.py            # 交易日历（校验日期、对齐缺口）
-│   │   └── updater.py             # 增量更新/定时同步逻辑
+│   │   ├── updater.py             # 增量更新/定时同步逻辑
+│   │   ├── fundamentals.py        # 基本面数据适配（财务指标/估值/盈利能力，新增）
+│   │   ├── quotes.py              # 近实时报价轮询适配（最新价/涨跌幅，新增）
+│   │   ├── universe.py            # 股票池适配：全市场列表/指数成分股/行业分类（新增）
+│   │   └── altdata.py             # A股另类数据：资金流向/龙虎榜/北向资金/机构持仓（新增）
+│   ├── experiments.py             # 回测/寻优实验记录（参数+结果落地，便于对比历史尝试，新增）
 │   ├── factors/                   # 因子库
 │   │   ├── base.py                # 因子接口
-│   │   └── technical.py           # 技术指标因子（MA/MACD/RSI/布林带…）
+│   │   ├── technical.py           # 技术指标因子（MA/MACD/RSI/布林带…）
+│   │   └── fundamental.py         # 基本面因子（PE/PB/ROE/营收增速等，新增）
 │   ├── strategies/
 │   │   ├── base.py                # 引擎无关的策略接口
 │   │   ├── ma_cross.py            # 双均线交叉（示例）
@@ -43,18 +50,20 @@ YunShan/
 │   ├── portfolio.py               # 组合与资金管理（仓位、现金、成交记录）
 │   ├── costs.py                   # 交易成本模型（手续费/滑点/印花税/过户费）
 │   ├── metrics.py                 # 业绩指标（含基准对比、交易级胜率、Sortino/Calmar…）
-│   └── optimize.py                # 参数寻优 / 走动检验（walk-forward）
+│   ├── optimize.py                # 参数寻优 / 走动检验（walk-forward）
+│   ├── screening.py               # 截面多因子选股打分/排名（新增）
+│   └── robustness.py              # 稳健性检验：deflated Sharpe、蒙特卡洛打乱检验（新增）
 ├── backend/                       # FastAPI 后端（API 层，薄封装，调用 quant）
 │   ├── main.py                    # 应用入口
-│   ├── routers/                   # 路由：symbols / backtest / strategies / optimize / data
+│   ├── routers/                   # 路由：symbols / backtest / strategies / optimize / data / screening / quotes
 │   ├── schemas.py                 # Pydantic 请求/响应模型
-│   ├── tasks.py                   # 长耗时回测/寻优的后台任务（BackgroundTasks/进程池）
+│   ├── tasks.py                   # 长耗时回测/寻优/截面打分的后台任务（BackgroundTasks/进程池）
 │   └── scheduler.py               # 定时数据更新（APScheduler）
 ├── frontend/                      # React + TypeScript SPA
 │   ├── src/
 │   │   ├── api/                   # 后端接口封装
-│   │   ├── pages/                 # 回测 / 策略对比 / 参数寻优 / 数据管理
-│   │   └── components/            # K线+信号图、净值曲线、回撤图、指标卡片（ECharts/lightweight-charts）
+│   │   ├── pages/                 # 回测 / 策略对比 / 参数寻优 / 数据管理 / 选股 / 个股详情
+│   │   └── components/            # K线+信号图、净值曲线、回撤图、指标卡片、选股结果表、个股详情卡（ECharts/lightweight-charts）
 │   └── package.json
 ├── tests/                         # 单元/集成测试（pytest）
 ├── data/                          # 本地数据缓存（gitignore）
@@ -73,6 +82,12 @@ YunShan/
 | 后端 | `FastAPI` + Pydantic | 与计算层同语言、异步、自动生成 OpenAPI 文档，前端对接顺畅 |
 | 前端 | `React` + `TypeScript` + `ECharts`/`lightweight-charts` | 做专业交互式图表与多页面分析，前后端彻底分离 |
 | 定时任务 | `APScheduler` | 收盘后增量更新行情，无需引入 Celery 这类重型队列（单用户场景够用） |
+| 基本面数据 | `akshare` 财务接口（资产负债表/利润表/估值指标） | 与行情数据同源，免费可用；通过 `fundamentals.py` 适配层统一接口 |
+| 近实时报价 | `akshare`/东方财富轮询 + 前端定时拉取 | 免费源延迟几秒到几十秒，对"选股看走势"场景足够；不引入 WebSocket/券商行情订阅，降低复杂度 |
+| 股票池/行业分类 | `akshare`（`stock_zh_a_spot_em`/`index_stock_cons`/`stock_board_industry_cons_em`） | 全市场列表、指数成分股、行业分类均免费可取，作为截面选股的候选池来源 |
+| 另类数据 | `akshare`（资金流向/龙虎榜/北向资金/十大流通股东等接口） | A股特色"注意点"数据源，免费可取，与现有行情数据同源同套缓存机制 |
+
+> 数据稳定性提示：以上 akshare 接口均为对公开网站的免费爬取封装，无需 API key，但格式可能随源站改版变化（已有 fetcher 重试机制可复用）；不属于付费数据商那种 SLA 保障的稳定接口，仅作研究用途完全够用。
 
 ## 回测引擎（核心模块详解）
 
@@ -86,6 +101,66 @@ YunShan/
 - **事件驱动引擎（Phase 2，预留接口后建）**：逐根 K 线重放（行情→信号→下单→撮合→更新组合），自然支持**止损止盈、限价单、部分成交、动态仓位**；结构贴近实盘，为未来扩展打底。
 - **引擎无关接口**：Phase 1 就把「策略接口」「组合/撮合接口」抽象好，Phase 2 接事件驱动引擎时已有策略零改动。
 - 备选：`vectorbt`（向量化、极快）/`backtrader`（事件驱动、成熟）作为后续可选项；本阶段以自建为主，保证"看得懂每一行计算"。
+
+## 股票池与行业分类（新增）
+
+截面选股的前提是先有一个明确的"候选池"，否则 `screening.py` 无的可选。补一个独立的数据层：
+
+- `quant/data/universe.py`：适配 akshare 免费接口，提供三种候选池来源——① 全市场 A 股列表（`stock_zh_a_spot_em`）；② 指定指数成分股（沪深300/中证500等，`index_stock_cons`）；③ 行业/概念板块成分股（`stock_board_industry_cons_em`）。
+- 候选池结果按日缓存（复用现有 `.meta.json` 按天失效机制），避免每次截面打分都重新拉全市场列表。
+- 后端：`GET /universe`（列出可选股票池：指数/行业列表）、`GET /universe/{key}/constituents`（取某个池子的成分股）。
+
+## 选股与截面分析（新增）
+
+现有能力是"对单一标的回测某个策略"，新增**跨股票截面选股**能力，对应用户实际需求（选股时先筛出候选池，再看走势/注意点）：
+
+- `quant/screening.py`：输入股票池（来自 `universe.py`）+ 因子组合（技术因子 + 基本面因子）→ 按权重打分排名，输出 Top N 候选及各因子明细分。
+- 支持**因子标准化**（截面 z-score/排名归一化）与**简单等权/自定义权重组合**，不引入复杂的多因子风险模型（按当前需求够用，过度设计无必要）。
+- 截面打分计算量较大（全市场），走后台任务（`backend/tasks.py`）+ 前端轮询进度，结果可缓存按天复用。
+- 后端：`POST /screening`（提交筛选条件，返回 Top N 排名 + 因子明细）。
+
+## 基本面数据（新增）
+
+技术指标因子之外补充基本面维度，用于选股"注意点"：
+
+- `quant/data/fundamentals.py`：适配 akshare 财务接口，拉取估值（PE/PB/PS）、盈利能力（ROE/毛利率）、成长性（营收/净利润增速）等核心指标，复用现有缓存机制（按 symbol + 报告期存储）。
+- `quant/factors/fundamental.py`：把基本面数据转成可与技术因子一起参与截面打分的标准因子（如"低 PE 高 ROE"组合）。
+- 仅做指标展示与截面打分输入，不做财务造假识别/审计类深度分析（超出当前研究回测系统范畴）。
+
+## 稳健性检验（新增）
+
+参数寻优容易"过拟合历史噪音"，新增检验手段，避免误信虚假 alpha：
+
+- `quant/robustness.py`：
+  - **Deflated Sharpe Ratio**：考虑寻优过程中尝试的参数组合数量，对 Sharpe 做统计显著性修正。
+  - **蒙特卡洛打乱检验**：随机打乱收益序列顺序/随机替换信号，重复回测，看原策略表现是否显著优于随机分布。
+- 与现有 `optimize.py` 的 `walk_forward` 互补：walk-forward 检验"样本外是否还有效"，本模块检验"结果是否只是统计噪音"。
+- 后端 `/optimize` 返回结果中附加显著性指标；前端寻优结果页展示。
+
+## 个股详情与轻量近实时报价（新增）
+
+对应"选股时看看这个股票的走势、注意点"的核心场景，做成一个轻量的个股详情页，而非独立的实时监控系统：
+
+- `quant/data/quotes.py`：轮询获取最新价/涨跌幅/分时数据，复用现有数据层的网络配置（no_proxy 等），不引入长连接。
+- 注意点提示复用现有 `quant/factors/technical.py` + 新增的 `fundamental.py`/`altdata.py`：在个股详情页直接计算当前是否触发 RSI 超买超卖、MACD 金叉死叉、布林带突破等信号，以及基本面是否处于估值高位/盈利恶化、是否有大额资金流出/上榜龙虎榜等，标签化展示。
+- 后端：`GET /quotes/{symbol}`（近实时报价）、`GET /symbols/{symbol}/signals`（当前信号 + 注意点标签）。
+- 前端：个股详情页用 `setInterval` 分钟级轮询 `/quotes/{symbol}`，叠加分时图 + 信号标签卡，不用 WebSocket，实现成本低。
+
+## A股另类数据（新增）
+
+技术面、基本面之外，补上 A 股投资者常看的"注意点"数据，全部走免费 akshare 接口：
+
+- `quant/data/altdata.py`：适配资金流向（个股/行业/概念资金净流入，`stock_individual_fund_flow` 等）、龙虎榜（`stock_lhb_detail_em`）、北向资金持股（`stock_hsgt_hold_stock_em`）、十大流通股东/机构持仓变动（`stock_gdfx_free_holding_detail_em`）。
+- 定位为**展示与标签数据**，不参与回测引擎计算（这些数据更新频率、口径与日线行情不完全对齐，强行做成可回测因子容易引入未来函数风险，按当前"辅助选股"需求只做展示即可）。
+- 接入个股详情页的"注意点"标签卡，以及（可选）作为截面选股的过滤条件（如"剔除近 5 日北向资金净流出标的"）。
+
+## 策略与实验记录（新增）
+
+参数寻优/截面选股跑多了容易忘记之前试过什么、效果如何，补一个轻量记录机制：
+
+- `quant/experiments.py`：每次回测/寻优/选股运行后，把入参（策略、参数、标的池、日期范围）与关键结果指标落地到本地（SQLite 或 JSON 文件），不引入 MLflow 等重型实验管理工具。
+- 后端：`GET /experiments`（历史记录列表，按时间倒序）、支持按策略/标的筛选。
+- 前端：「历史记录」页，列表 + 点击展开查看当次详细结果，方便对比"这次参数和上次比是变好了还是变差了"。
 
 ## 已发现并需修正的问题（来自对现有代码的审查）
 
@@ -127,6 +202,26 @@ YunShan/
 **Phase 4 — 事件驱动引擎（预留接口已就绪）**
 - 实现 `engine/event_driven.py`，支持止损止盈、限价单等路径依赖策略；已有策略零改动接入。
 
+**Phase 5 — 股票池 + 基本面数据 + 截面选股**
+- `quant/data/universe.py`：全市场列表/指数成分股/行业分类，按日缓存；后端 `/universe`。
+- `quant/data/fundamentals.py`：财务/估值数据拉取与缓存。
+- `quant/factors/fundamental.py`：基本面因子标准化。
+- `quant/screening.py`：截面多因子打分排名；后端 `/screening`（后台任务）；前端「选股」页面（候选池表格 + 因子明细）。
+
+**Phase 6 — 稳健性检验**
+- `quant/robustness.py`：Deflated Sharpe、蒙特卡洛打乱检验。
+- 接入 `/optimize` 返回结果与前端寻优结果页。
+
+**Phase 7 — 个股详情 + 近实时报价 + 另类数据**
+- `quant/data/quotes.py`：轮询式最新报价。
+- `quant/data/altdata.py`：资金流向/龙虎榜/北向资金/机构持仓，作为展示标签数据。
+- 后端 `/quotes/{symbol}`、`/symbols/{symbol}/signals`。
+- 前端「个股详情」页：分时图 + 定时轮询刷新 + 技术/基本面/另类数据信号标签。
+
+**Phase 8 — 策略与实验记录**
+- `quant/experiments.py`：回测/寻优/选股运行记录落地（SQLite/JSON）。
+- 后端 `/experiments`；前端「历史记录」页。
+
 ## 验证方式
 
 - **核心库**：pytest 覆盖——构造已知行情验证回测净值/成本/指标数值正确；专门用例验证"无未来函数"（把未来数据打乱不应改变历史信号）；缓存增量更新用例（先拉小区间再拉大区间应补齐而非返回子集）。
@@ -137,14 +232,14 @@ YunShan/
 ## 后续阶段（本次不做，仅记录）
 
 - 美股数据源（yfinance）接入（适配层已预留）。
-- 更丰富的因子库与机器学习因子。
-- 实盘/模拟盘对接（订单、实时风控、券商接口）——需引入实时行情、撮合、资金安全模块，届时事件驱动引擎可直接复用。
+- 更丰富的机器学习因子（截面打分目前仅做线性/等权组合，不引入模型训练）。
+- 实盘/模拟盘对接（订单、撮合、实时风控、券商接口、资金安全）——本设计的「近实时报价」仅为轮询展示，不涉及下单与撮合，与此处的实盘对接是两件事；若未来要做实盘，事件驱动引擎可直接复用。
 - 多用户与权限（如需对外提供）。
 
 ## 实施状态
 
 - 上一版本：Streamlit 最小闭环已完成（数据→双均线→回测→指标→页面）。
-- 本设计：架构升级为 FastAPI + React + 解耦核心库；Phase 0–4 规划如上，按阶段推进。
+- 本设计：架构升级为 FastAPI + React + 解耦核心库；Phase 0–8 规划如上，按阶段推进。
 - **Phase 0 已完成**（2026-06-18）：
   - `quant/` 重组为 `data/ engine/ strategies/` 子包 + `config/costs/portfolio/metrics`。
   - **修复缓存 bug**：缓存按 `symbol+adjust` 分文件、记录已请求区间、增量补拉头尾缺口（`quant/data/`）。
@@ -180,4 +275,4 @@ YunShan/
   - dev 经 `/api` 代理到后端；`vite.config.ts` 强制 loopback 不走 HTTP 代理（避免本地 Clash 代理导致 502）。
   - `npm run build` 通过 tsc 类型检查；前后端联调链路（前端→vite 代理→FastAPI→quant）已实测打通。
   - 启动见根目录 `README.md`：终端1 `uvicorn backend.main:app --reload`，终端2 `cd frontend && npm run dev`，浏览器开 http://localhost:5173。
-- 至此 Phase 0–3 全部完成：核心研究能力 + 后端 API + React 前端，端到端可用。仍待后续：多标的组合、scheduler 定时更新、事件驱动引擎（Phase 4）。
+- 至此 Phase 0–3 全部完成：核心研究能力 + 后端 API + React 前端，端到端可用。仍待后续：多标的组合、scheduler 定时更新、事件驱动引擎（Phase 4），以及股票池/基本面数据/截面选股（Phase 5）、稳健性检验（Phase 6）、个股详情/近实时报价/另类数据（Phase 7）、策略与实验记录（Phase 8）。
