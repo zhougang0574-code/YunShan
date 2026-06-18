@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 
 from quant import get_daily, run_strategy_backtest
+from quant.data import get_name
 
 from ..schemas import BacktestRequest, BacktestResponse, BacktestSeries
 
@@ -34,6 +35,7 @@ def run(req: BacktestRequest) -> BacktestResponse:
     )
     return BacktestResponse(
         symbol=req.symbol,
+        name=get_name(req.symbol),
         strategy=req.strategy,
         params=req.params,
         stats={k: float(v) for k, v in stats.items()},

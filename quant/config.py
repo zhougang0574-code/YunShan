@@ -10,37 +10,41 @@ import pathlib
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 
-# ---- 数据源直连（绕过本地代理）----
-# eastmoney / sina 等行情源都是国内站点，应直连。自动把它们加入 no_proxy，
-# 避免本机代理（如未启动的 Clash 127.0.0.1:7890）拦截请求导致 ProxyError。
-# 只影响这些数据主机，不改变其它主机的代理行为。
-_DOMESTIC_DATA_HOSTS = [
-    "eastmoney.com",
-    "push2his.eastmoney.com",
-    "push2.eastmoney.com",
-    "sina.com.cn",
-    "sinajs.cn",
-    "hq.sinajs.cn",
-]
+# ---- 数据源直连（彻底无视本地代理）----
+# 行情源 eastmoney/sina 都是国内站点，应直连；本项目也只访问国内行情源 + 本机服务，
+# 不需要任何 HTTP 代理。而本机代理（如 Clash 127.0.0.1:7890）一旦未运行或配置异常，
+# 会导致 ProxyError / RemoteDisconnected。因此默认在**本进程内**清除代理环境变量，
+# 让所有请求直连——这不影响系统全局代理，只作用于运行本程序的进程。
+# 若你确实要让本程序走代理，把 IGNORE_PROXY 改成 False。
+IGNORE_PROXY = True
+
+_PROXY_ENV_KEYS = (
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+)
 
 
-def _bypass_proxy_for_data_hosts() -> None:
-    for key in ("no_proxy", "NO_PROXY"):
-        hosts = [h for h in os.environ.get(key, "").split(",") if h]
-        for host in _DOMESTIC_DATA_HOSTS:
-            if host not in hosts:
-                hosts.append(host)
-        os.environ[key] = ",".join(hosts)
+def _disable_proxy_in_process() -> None:
+    for key in _PROXY_ENV_KEYS:
+        os.environ.pop(key, None)
+    # 兜底：个别库即便无代理变量仍会查询，显式声明"全部不走代理"
+    os.environ["no_proxy"] = "*"
+    os.environ["NO_PROXY"] = "*"
 
 
-_bypass_proxy_for_data_hosts()
+if IGNORE_PROXY:
+    _disable_proxy_in_process()
 
 # ---- 数据源 ----
 # akshare 拉取的复权方式默认值："qfq"(前复权)/"hfq"(后复权)/""(不复权)
 DEFAULT_ADJUST = "qfq"
-# akshare 请求失败时的重试次数与退避秒数
-FETCH_MAX_RETRIES = 3
-FETCH_RETRY_BACKOFF = 1.0
+# akshare 请求失败时的重试次数与退避秒数（东财偶发断连，多试几次成功率更高）
+FETCH_MAX_RETRIES = 5
+FETCH_RETRY_BACKOFF = 1.5
 
 # ---- 交易成本默认值（A股）----
 # 佣金费率（双边），万分之几，含最低 5 元由 costs 模块处理

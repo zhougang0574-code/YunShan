@@ -25,6 +25,9 @@ def _synthetic_price(symbol, start, end, adjust="qfq"):
 def patch_get_daily(monkeypatch):
     for mod in (backtest_router, data_router, optimize_router):
         monkeypatch.setattr(mod, "get_daily", _synthetic_price)
+    # 名称查询固定返回，避免触网
+    for mod in (backtest_router, data_router):
+        monkeypatch.setattr(mod, "get_name", lambda s: "测试股票")
 
 
 @pytest.fixture
@@ -50,6 +53,7 @@ def test_data_endpoint(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["symbol"] == "000001" and body["rows"] == 250
+    assert body["name"] == "测试股票"
 
 
 def test_backtest_endpoint(client):

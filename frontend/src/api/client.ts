@@ -19,6 +19,7 @@ export interface BacktestSeries {
 
 export interface BacktestResponse {
   symbol: string;
+  name: string;
   strategy: string;
   params: Params;
   stats: Record<string, number>;

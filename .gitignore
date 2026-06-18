@@ -7,7 +7,9 @@ __pycache__/
 .mypy_cache/
 
 # ---- 本地数据缓存（行情 parquet、交易日历）----
-data/
+# 注意：前导 / 锚定到仓库根目录，只忽略根目录的 data/ 缓存，
+# 不能写成 data/（那会连源码包 quant/data/ 一起忽略掉）。
+/data/
 
 # ---- 前端 ----
 frontend/node_modules/

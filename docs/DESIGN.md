@@ -148,6 +148,8 @@ YunShan/
 - **Phase 0 已完成**（2026-06-18）：
   - `quant/` 重组为 `data/ engine/ strategies/` 子包 + `config/costs/portfolio/metrics`。
   - **修复缓存 bug**：缓存按 `symbol+adjust` 分文件、记录已请求区间、增量补拉头尾缺口（`quant/data/`）。
+  - **缓存按天失效**（2026-06-18 增强）：`.meta.json` 记录 `fetched` 拉取日期；只信任"当天拉取的"缓存，
+    隔天再查自动重拉最新行情（顺带解决前复权价随分红被重算导致的旧缓存失真问题）。当天内重复查询仍走缓存。
   - 新增交易日历 `quant/data/calendar.py`、成本模型 `costs.py`、组合账户 `portfolio.py`。
   - 向量化引擎接入成本模型 + 买入持有基准（`quant/engine/vectorized.py`）。
   - 指标修正：交易级胜率、Sortino/Calmar、基准超额、active-only 夏普（`metrics.py`）。

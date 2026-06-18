@@ -14,6 +14,7 @@ class StrategyInfo(BaseModel):
 
 class DataInfo(BaseModel):
     symbol: str
+    name: str = ""
     adjust: str
     rows: int
     start: str | None = None
@@ -41,6 +42,7 @@ class BacktestSeries(BaseModel):
 
 class BacktestResponse(BaseModel):
     symbol: str
+    name: str = ""
     strategy: str
     params: dict[str, Any]
     stats: dict[str, float]

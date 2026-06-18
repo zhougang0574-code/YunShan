@@ -75,6 +75,31 @@ button.secondary {
   border: 1px solid #2563eb;
 }
 
+.result-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.result-symbol {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2933;
+}
+
+.result-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.result-strategy {
+  font-size: 13px;
+  color: #7b8794;
+  margin-left: auto;
+}
+
 .cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

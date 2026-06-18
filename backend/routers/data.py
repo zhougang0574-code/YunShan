@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from quant import config, get_daily
+from quant.data import get_name
 
 from ..schemas import DataInfo
 
@@ -27,6 +28,7 @@ def fetch_data(
 
     return DataInfo(
         symbol=symbol,
+        name=get_name(symbol),
         adjust=adjust,
         rows=len(df),
         start=str(df.index.min().date()),

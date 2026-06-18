@@ -177,6 +177,11 @@ export default function App() {
 
         {result && (
           <>
+            <div className="result-header">
+              <span className="result-symbol">{result.symbol}</span>
+              <span className="result-name">{result.name || "（未知名称）"}</span>
+              <span className="result-strategy">策略：{result.strategy}</span>
+            </div>
             <div className="cards">
               {METRIC_CARDS.map((m) => (
                 <MetricCard key={m.key} meta={m} value={result.stats[m.key]} />
