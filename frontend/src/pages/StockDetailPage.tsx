@@ -21,7 +21,7 @@ const FUND_LABELS: Record<string, string> = {
   pb: "PB",
   ps_ttm: "PS(TTM)",
   dv_ttm: "股息率%",
-  total_mv: "总市值",
+  total_mv: "总市值(亿)",
   roe: "ROE%",
   gross_margin: "毛利率%",
   revenue_yoy: "营收增速%",

@@ -57,26 +57,44 @@ def market_snapshot(use_cache: bool = True) -> pd.DataFrame:
     return df
 
 
-def _last_row(df: pd.DataFrame) -> pd.Series:
-    return df.iloc[-1] if df is not None and not df.empty else pd.Series(dtype=float)
+def _baidu_last(symbol: str, *indicators: str) -> float:
+    """百度估值时间序列取最近一个有效值；依次尝试多个候选指标名。"""
+    import akshare as ak
+
+    for indicator in indicators:
+        try:
+            df = ak.stock_zh_valuation_baidu(symbol=symbol, indicator=indicator, period="近一年")
+            s = pd.to_numeric(df["value"], errors="coerce").dropna()
+            if len(s):
+                return float(s.iloc[-1])
+        except Exception:
+            continue
+    return float("nan")
 
 
-def _pick(row: pd.Series, *keywords: str) -> float:
-    """从一行里按关键词模糊匹配取数值，取不到返回 NaN。"""
-    for col in row.index:
-        label = str(col)
-        if all(k in label for k in keywords):
-            try:
-                val = float(row[col])
-                return val if not math.isnan(val) else float("nan")
-            except (ValueError, TypeError):
-                continue
+def _abstract_latest(df: pd.DataFrame, *keywords: str) -> float:
+    """从新浪财务摘要里，按关键词匹配指标行，取最近一期（最左日期列）的有效值。"""
+    if df is None or df.empty or len(df.columns) < 3:
+        return float("nan")
+    ind_col = df.columns[1]          # “指标”列
+    date_cols = list(df.columns[2:])  # 各报告期，已按日期降序
+    for _, row in df.iterrows():
+        name = str(row[ind_col])
+        if all(k in name for k in keywords):
+            for c in date_cols:
+                v = pd.to_numeric(pd.Series([row[c]]), errors="coerce").iloc[0]
+                if not (isinstance(v, float) and math.isnan(v)):
+                    return float(v)
     return float("nan")
 
 
 def get_fundamentals(symbol: str, use_cache: bool = True) -> dict:
-    """单只股票的基本面指标字典（估值/盈利/成长）。逐股慢接口，缓存 7 天。"""
-    key = f"fundamentals_detail_{symbol}"
+    """单只股票的基本面指标字典（估值/盈利/成长）。逐股慢接口，缓存 7 天。
+
+    数据源用非东财的接口（百度估值 + 新浪财务摘要），在东财被网络掐断时仍可用。
+    """
+    # v2：换数据源后用新缓存键，自动丢弃旧（可能全空）的缓存
+    key = f"fundamentals_detail_v2_{symbol}"
     if use_cache:
         cached = daycache.load(key, max_age_days=7)
         if cached is not None:
@@ -87,7 +105,7 @@ def get_fundamentals(symbol: str, use_cache: bool = True) -> dict:
         "pb": float("nan"),
         "ps_ttm": float("nan"),
         "dv_ttm": float("nan"),
-        "total_mv": float("nan"),
+        "total_mv": float("nan"),  # 单位：亿元
         "roe": float("nan"),
         "gross_margin": float("nan"),
         "revenue_yoy": float("nan"),
@@ -96,31 +114,22 @@ def get_fundamentals(symbol: str, use_cache: bool = True) -> dict:
     # 基金/ETF 没有个股财务指标，直接返回空值，跳过逐股慢接口。
     if is_fund(symbol):
         return result
+
+    # 估值（百度）
+    result["pe_ttm"] = _baidu_last(symbol, "市盈率(TTM)")
+    result["pb"] = _baidu_last(symbol, "市净率")
+    result["ps_ttm"] = _baidu_last(symbol, "市销率(TTM)", "市销率")
+    result["total_mv"] = _baidu_last(symbol, "总市值")
+
+    # 盈利能力 / 成长性（新浪财务摘要）
     try:
         import akshare as ak
 
-        val = _last_row(ak.stock_a_indicator_lg(symbol=symbol))
-        if not val.empty:
-            result.update(
-                pe_ttm=_pick(val, "pe_ttm") if "pe_ttm" in val.index else _pick(val, "pe"),
-                pb=_pick(val, "pb"),
-                ps_ttm=_pick(val, "ps_ttm") if "ps_ttm" in val.index else _pick(val, "ps"),
-                dv_ttm=_pick(val, "dv_ttm") if "dv_ttm" in val.index else _pick(val, "dv"),
-                total_mv=_pick(val, "total_mv"),
-            )
-    except Exception:
-        pass
-    try:
-        import akshare as ak
-
-        fin = _last_row(ak.stock_financial_analysis_indicator(symbol=symbol))
-        if not fin.empty:
-            result.update(
-                roe=_pick(fin, "净资产收益率"),
-                gross_margin=_pick(fin, "销售毛利率"),
-                revenue_yoy=_pick(fin, "主营业务收入增长率"),
-                profit_yoy=_pick(fin, "净利润增长率"),
-            )
+        fin = ak.stock_financial_abstract(symbol=symbol)
+        result["roe"] = _abstract_latest(fin, "净资产收益率")
+        result["gross_margin"] = _abstract_latest(fin, "毛利率")
+        result["revenue_yoy"] = _abstract_latest(fin, "营业总收入", "增长")
+        result["profit_yoy"] = _abstract_latest(fin, "净利润", "增长")
     except Exception:
         pass
 

@@ -2,15 +2,18 @@
 
 供个股详情页分钟级轮询：取最新价/涨跌幅与当日分时。延迟几秒到几十秒对"选股看走势"
 场景足够，不引入 WebSocket/券商订阅。复用 ``config`` 的直连（no_proxy）设置。
-**不做按天缓存**——这是近实时数据，每次都直接取最新。akshare 偶发失败时返回空结构，
-由上层降级展示。
+**不做按天缓存**——这是近实时数据；但实时全表用很短的进程内 TTL 缓存，避免分钟级
+轮询每次都拉一遍全市场快照。akshare 偶发失败时返回空结构，由上层降级展示。
+
+数据源选用新浪（``stock_zh_a_spot`` / ``fund_etf_category_sina`` / ``stock_zh_a_minute``），
+在东财被网络掐断的环境下仍可用。
 """
 
 import time
 
 import pandas as pd
 
-from .instruments import is_fund
+from .instruments import is_fund, market
 
 
 def _f(v) -> float | None:
@@ -20,46 +23,40 @@ def _f(v) -> float | None:
         return None
 
 
-# 场内基金/ETF 实时快照（新浪全表），短 TTL 进程内缓存，避免分钟级轮询每次拉全表。
-_ETF_SPOT_TTL = 30  # 秒
-_etf_spot_cache: dict = {"ts": 0.0, "df": None}
+# 实时快照：个股 / 基金各一张新浪全表，短 TTL 进程内缓存。
+_SPOT_TTL = 30  # 秒
+_spot_cache: dict[str, tuple[float, pd.DataFrame]] = {}
 
 
-def _etf_spot() -> pd.DataFrame:
+def _spot(kind: str) -> pd.DataFrame:
+    """取（缓存的）新浪实时全表，附加 6 位代码列 ``__code`` 供过滤。"""
     now = time.time()
-    if _etf_spot_cache["df"] is not None and now - _etf_spot_cache["ts"] < _ETF_SPOT_TTL:
-        return _etf_spot_cache["df"]
+    cached = _spot_cache.get(kind)
+    if cached is not None and now - cached[0] < _SPOT_TTL:
+        return cached[1]
+
     import akshare as ak
 
-    df = ak.fund_etf_category_sina(symbol="ETF基金").copy()
+    if kind == "fund":
+        df = ak.fund_etf_category_sina(symbol="ETF基金").copy()
+    else:
+        df = ak.stock_zh_a_spot().copy()
     df["__code"] = df["代码"].astype(str).str[-6:]
-    _etf_spot_cache.update(ts=now, df=df)
+    _spot_cache[kind] = (now, df)
     return df
 
 
-def _fund_quote(symbol: str, result: dict) -> dict:
-    """ETF 报价：用新浪 ETF 实时全表过滤出本只。"""
-    try:
-        df = _etf_spot()
-        row = df[df["__code"] == symbol]
-        if not row.empty:
-            r = row.iloc[0]
-            mapping = {
-                "最新价": "price",
-                "涨跌幅": "pct_chg",
-                "今开": "open",
-                "最高": "high",
-                "最低": "low",
-                "昨收": "prev_close",
-                "成交量": "volume",
-                "成交额": "amount",
-            }
-            for zh, en in mapping.items():
-                if zh in r.index:
-                    result[en] = _f(r[zh])
-    except Exception:
-        pass
-    return result
+# 新浪快照里的中文列 -> 我们的字段（个股与基金两张表列名一致）
+_QUOTE_MAP = {
+    "最新价": "price",
+    "涨跌幅": "pct_chg",
+    "今开": "open",
+    "最高": "high",
+    "最低": "low",
+    "昨收": "prev_close",
+    "成交量": "volume",
+    "成交额": "amount",
+}
 
 
 def get_quote(symbol: str) -> dict:
@@ -75,47 +72,40 @@ def get_quote(symbol: str) -> dict:
         "volume": None,
         "amount": None,
     }
-    if is_fund(symbol):
-        return _fund_quote(symbol, result)
+    kind = "fund" if is_fund(symbol) else "stock"
     try:
-        import akshare as ak
-
-        df = ak.stock_bid_ask_em(symbol=symbol)
-        # 该接口返回两列 item/value 的键值表
-        kv = dict(zip(df["item"].astype(str), df["value"]))
-        mapping = {
-            "最新": "price",
-            "涨幅": "pct_chg",
-            "今开": "open",
-            "最高": "high",
-            "最低": "low",
-            "昨收": "prev_close",
-            "总手": "volume",
-            "金额": "amount",
-        }
-        for zh, en in mapping.items():
-            if zh in kv:
-                result[en] = _f(kv[zh])
+        df = _spot(kind)
+        row = df[df["__code"] == symbol]
+        if not row.empty:
+            r = row.iloc[0]
+            for zh, en in _QUOTE_MAP.items():
+                if zh in r.index:
+                    result[en] = _f(r[zh])
     except Exception:
         pass
     return result
 
 
 def get_intraday(symbol: str) -> pd.DataFrame:
-    """当日分时（时间 + 价格 + 成交量）。失败返回空 DataFrame。"""
+    """当日分时（时间 + 价格 + 成交量）。用新浪分钟线取最近一个交易日，失败返回空。"""
     try:
         import akshare as ak
 
-        raw = ak.stock_intraday_em(symbol=symbol)
+        raw = ak.stock_zh_a_minute(symbol=f"{market(symbol)}{symbol}", period="1", adjust="")
         if raw is None or raw.empty:
             return pd.DataFrame(columns=["time", "price", "volume"])
-        cols = {c: str(c) for c in raw.columns}
-        time_col = next((c for c in raw.columns if "时间" in str(c)), raw.columns[0])
-        price_col = next((c for c in raw.columns if "成交价" in str(c) or "价" in str(c)), None)
-        vol_col = next((c for c in raw.columns if "手" in str(c) or "量" in str(c)), None)
-        out = pd.DataFrame({"time": raw[time_col].astype(str)})
-        out["price"] = pd.to_numeric(raw[price_col], errors="coerce") if price_col else None
-        out["volume"] = pd.to_numeric(raw[vol_col], errors="coerce") if vol_col else None
-        return out
+        df = raw.copy()
+        df["day"] = df["day"].astype(str)
+        # 分钟线含最近若干交易日，这里只取最新一个交易日
+        last_date = df["day"].str.slice(0, 10).max()
+        today = df[df["day"].str.startswith(last_date)]
+        out = pd.DataFrame(
+            {
+                "time": today["day"].str.slice(11, 16),
+                "price": pd.to_numeric(today["close"], errors="coerce"),
+                "volume": pd.to_numeric(today["volume"], errors="coerce"),
+            }
+        )
+        return out.reset_index(drop=True)
     except Exception:
         return pd.DataFrame(columns=["time", "price", "volume"])
