@@ -9,6 +9,7 @@ import {
   runOptimize,
   StrategyInfo,
 } from "../api/client";
+import DatePicker from "../components/DatePicker";
 import EquityChart from "../components/EquityChart";
 import MetricCard from "../components/MetricCard";
 import OptimizePanel from "../components/OptimizePanel";
@@ -18,22 +19,60 @@ import { METRIC_CARDS } from "../metrics";
 
 const OPT_METRICS = ["sharpe_ratio", "annualized_return", "calmar_ratio", "sortino_ratio"];
 
+function fmtDate(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+// 默认区间：当年 1 月 1 日 ~ 今天
+const DEFAULT_START = `${new Date().getFullYear()}-01-01`;
+const DEFAULT_END = fmtDate(new Date());
+
+// 模块级缓存：在 SPA 内切到别的页面再回到本页时，保留上次的查询条件与结果，
+// 不会被重置回默认值（组件卸载/重挂载时从这里恢复）。
+interface PageCache {
+  symbol: string;
+  start: string;
+  end: string;
+  strategyName: string;
+  params: Params;
+  optMetric: string;
+  engine: "vectorized" | "event";
+  stopLoss: string;
+  takeProfit: string;
+  result: BacktestResponse | null;
+  optResult: OptimizeResponse | null;
+}
+const cache: PageCache = {
+  symbol: "000001",
+  start: DEFAULT_START,
+  end: DEFAULT_END,
+  strategyName: "",
+  params: {},
+  optMetric: "sharpe_ratio",
+  engine: "vectorized",
+  stopLoss: "",
+  takeProfit: "",
+  result: null,
+  optResult: null,
+};
+
 export default function BacktestPage() {
   const [strategies, setStrategies] = useState<StrategyInfo[]>([]);
-  const [symbol, setSymbol] = useState("000001");
-  const [start, setStart] = useState("2022-01-01");
-  const [end, setEnd] = useState("2023-12-31");
-  const [strategyName, setStrategyName] = useState("");
-  const [params, setParams] = useState<Params>({});
-  const [optMetric, setOptMetric] = useState("sharpe_ratio");
-  const [engine, setEngine] = useState<"vectorized" | "event">("vectorized");
-  const [stopLoss, setStopLoss] = useState("");
-  const [takeProfit, setTakeProfit] = useState("");
+  const [symbol, setSymbol] = useState(cache.symbol);
+  const [start, setStart] = useState(cache.start);
+  const [end, setEnd] = useState(cache.end);
+  const [strategyName, setStrategyName] = useState(cache.strategyName);
+  const [params, setParams] = useState<Params>(cache.params);
+  const [optMetric, setOptMetric] = useState(cache.optMetric);
+  const [engine, setEngine] = useState<"vectorized" | "event">(cache.engine);
+  const [stopLoss, setStopLoss] = useState(cache.stopLoss);
+  const [takeProfit, setTakeProfit] = useState(cache.takeProfit);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<BacktestResponse | null>(null);
-  const [optResult, setOptResult] = useState<OptimizeResponse | null>(null);
+  const [result, setResult] = useState<BacktestResponse | null>(cache.result);
+  const [optResult, setOptResult] = useState<OptimizeResponse | null>(cache.optResult);
 
   const current = useMemo(
     () => strategies.find((s) => s.name === strategyName),
@@ -44,11 +83,29 @@ export default function BacktestPage() {
     getStrategies()
       .then((list) => {
         setStrategies(list);
-        if (list.length) selectStrategy(list[0]);
+        // 仅在没有从缓存恢复出策略时才默认选第一个，避免覆盖上次的选择
+        if (list.length && !strategyName) selectStrategy(list[0]);
       })
       .catch((e) => setError(`无法加载策略列表：${e.message}（后端启动了吗？）`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 任意查询条件/结果变化时写回模块级缓存，供下次回到本页恢复
+  useEffect(() => {
+    Object.assign(cache, {
+      symbol,
+      start,
+      end,
+      strategyName,
+      params,
+      optMetric,
+      engine,
+      stopLoss,
+      takeProfit,
+      result,
+      optResult,
+    });
+  }, [symbol, start, end, strategyName, params, optMetric, engine, stopLoss, takeProfit, result, optResult]);
 
   function selectStrategy(s: StrategyInfo) {
     setStrategyName(s.name);
@@ -105,10 +162,10 @@ export default function BacktestPage() {
         <input value={symbol} onChange={(e) => setSymbol(e.target.value)} />
 
         <label>开始日期</label>
-        <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+        <DatePicker value={start} onChange={setStart} />
 
         <label>结束日期</label>
-        <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+        <DatePicker value={end} onChange={setEnd} />
 
         <label>策略</label>
         <select
