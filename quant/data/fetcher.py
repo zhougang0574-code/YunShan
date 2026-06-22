@@ -15,6 +15,7 @@ import pandas as pd
 from .. import config
 from . import storage
 
+# 东财中文列名 → 统一英文列名
 COLUMN_MAP = {
     "日期": "date",
     "开盘": "open",
@@ -26,33 +27,83 @@ COLUMN_MAP = {
 }
 
 
-def _fetch_raw(symbol: str, start: str, end: str, adjust: str) -> pd.DataFrame:
-    """直接从 akshare 拉取并规范化为以 date 为索引的 DataFrame（带重试）。"""
-    last_err: Exception | None = None
-    for attempt in range(config.FETCH_MAX_RETRIES):
-        try:
-            raw = ak.stock_zh_a_hist(
-                symbol=symbol,
-                period="daily",
-                start_date=start.replace("-", ""),
-                end_date=end.replace("-", ""),
-                adjust=adjust,
-            )
-            break
-        except Exception as err:  # akshare 偶发网络/限流错误
-            last_err = err
-            time.sleep(config.FETCH_RETRY_BACKOFF * (attempt + 1))
-    else:
-        raise RuntimeError(
-            f"akshare 拉取 {symbol} 失败（{type(last_err).__name__}: {last_err}）"
-        ) from last_err
-
+def _normalize(raw: pd.DataFrame, column_map: dict) -> pd.DataFrame:
+    """把数据源返回的原始表规范化为以 date 为索引、列为 storage.COLUMNS 的表。"""
     if raw is None or raw.empty:
         return pd.DataFrame(columns=storage.COLUMNS)
-
-    df = raw.rename(columns=COLUMN_MAP)[["date", *storage.COLUMNS]].copy()
+    df = raw.rename(columns=column_map)[["date", *storage.COLUMNS]].copy()
     df["date"] = pd.to_datetime(df["date"])
     return df.set_index("date").sort_index()
+
+
+def _fetch_eastmoney(symbol: str, start: str, end: str, adjust: str) -> pd.DataFrame:
+    raw = ak.stock_zh_a_hist(
+        symbol=symbol,
+        period="daily",
+        start_date=start.replace("-", ""),
+        end_date=end.replace("-", ""),
+        adjust=adjust,
+    )
+    return _normalize(raw, COLUMN_MAP)
+
+
+def _sina_symbol(symbol: str) -> str:
+    """新浪源代码需带市场前缀：沪市 sh / 深市 sz / 北交所 bj。"""
+    if symbol.startswith(("6", "9")):  # 沪市主板 / 科创板(688) / B股
+        return f"sh{symbol}"
+    if symbol.startswith(("4", "8")):  # 北交所
+        return f"bj{symbol}"
+    return f"sz{symbol}"  # 深市主板/中小板/创业板(0/2/3)
+
+
+def _fetch_sina(symbol: str, start: str, end: str, adjust: str) -> pd.DataFrame:
+    # 新浪返回的列已是英文（date/open/high/low/close/volume/amount），无需改名。
+    # 注意：成交量(volume)单位与东财口径可能略有差异，但回测信号只用价格，影响可忽略。
+    raw = ak.stock_zh_a_daily(
+        symbol=_sina_symbol(symbol),
+        start_date=start.replace("-", ""),
+        end_date=end.replace("-", ""),
+        adjust=adjust,
+    )
+    return _normalize(raw, {})
+
+
+# 数据源主备：东财为主，失败时回退新浪。
+# 部分网络（Clash TUN / 运营商对东财的干扰）会稳定掐断东财连接，而新浪可用，
+# 多源回退让回测在这些环境下也能正常拉到数据。
+_SOURCES = (
+    ("eastmoney", _fetch_eastmoney),
+    ("sina", _fetch_sina),
+)
+
+
+# 上次成功的数据源下标。某些网络环境下主源（东财）会稳定不可用，记住可用源后
+# 下次优先尝试它，避免每次都先在不可用的源上重试、空等数秒。
+_preferred_source = 0
+
+
+def _fetch_raw(symbol: str, start: str, end: str, adjust: str) -> pd.DataFrame:
+    """从数据源拉取并规范化为以 date 为索引的 DataFrame（多源 + 重试）。"""
+    global _preferred_source
+    order = [_preferred_source] + [
+        i for i in range(len(_SOURCES)) if i != _preferred_source
+    ]
+    last_err: Exception | None = None
+    for i in order:
+        _, fetch = _SOURCES[i]
+        for attempt in range(config.FETCH_MAX_RETRIES):
+            try:
+                df = fetch(symbol, start, end, adjust)
+                _preferred_source = i  # 记住可用源，下次优先用
+                return df
+            except Exception as err:  # 偶发网络/限流错误，重试或切换数据源
+                last_err = err
+                time.sleep(config.FETCH_RETRY_BACKOFF * (attempt + 1))
+    sources = "/".join(name for name, _ in _SOURCES)
+    raise RuntimeError(
+        f"行情拉取 {symbol} 失败（已尝试 {sources}；"
+        f"最后错误 {type(last_err).__name__}: {last_err}）"
+    ) from last_err
 
 
 def _merge(*frames: pd.DataFrame) -> pd.DataFrame:

@@ -36,11 +36,11 @@ def client():
 
 
 def test_health(client):
-    assert client.get("/health").json() == {"status": "ok"}
+    assert client.get("/api/health").json() == {"status": "ok"}
 
 
 def test_list_strategies(client):
-    resp = client.get("/strategies")
+    resp = client.get("/api/strategies")
     assert resp.status_code == 200
     names = {s["name"] for s in resp.json()}
     assert {"ma_cross", "rsi_reversal", "macd_trend", "bollinger_revert"} <= names
@@ -49,7 +49,7 @@ def test_list_strategies(client):
 
 
 def test_data_endpoint(client):
-    resp = client.get("/data/000001", params={"start": "2022-01-03", "end": "2023-01-01"})
+    resp = client.get("/api/data/000001", params={"start": "2022-01-03", "end": "2023-01-01"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["symbol"] == "000001" and body["rows"] == 250
@@ -58,7 +58,7 @@ def test_data_endpoint(client):
 
 def test_backtest_endpoint(client):
     resp = client.post(
-        "/backtest",
+        "/api/backtest",
         json={
             "symbol": "000001",
             "start": "2022-01-03",
@@ -74,9 +74,29 @@ def test_backtest_endpoint(client):
     assert len(s["dates"]) == len(s["equity"]) == len(s["benchmark_equity"]) == 250
 
 
+def test_backtest_event_engine_with_stops(client):
+    resp = client.post(
+        "/api/backtest",
+        json={
+            "symbol": "000001",
+            "start": "2022-01-03",
+            "end": "2023-01-01",
+            "strategy": "ma_cross",
+            "params": {"short_window": 5, "long_window": 20},
+            "engine": "event",
+            "stop_loss": 0.08,
+            "take_profit": 0.2,
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "sharpe_ratio" in body["stats"]
+    assert len(body["series"]["equity"]) == 250
+
+
 def test_backtest_invalid_params(client):
     resp = client.post(
-        "/backtest",
+        "/api/backtest",
         json={
             "symbol": "000001",
             "start": "2022-01-03",
@@ -90,7 +110,7 @@ def test_backtest_invalid_params(client):
 
 def test_backtest_unknown_strategy(client):
     resp = client.post(
-        "/backtest",
+        "/api/backtest",
         json={
             "symbol": "000001",
             "start": "2022-01-03",
@@ -103,7 +123,7 @@ def test_backtest_unknown_strategy(client):
 
 def test_optimize_grid(client):
     resp = client.post(
-        "/optimize",
+        "/api/optimize",
         json={
             "symbol": "000001",
             "start": "2022-01-03",
@@ -114,13 +134,18 @@ def test_optimize_grid(client):
         },
     )
     assert resp.status_code == 200
-    results = resp.json()["results"]
+    body = resp.json()
+    results = body["results"]
     assert results and "sharpe_ratio" in results[0]
+    # 网格寻优附带稳健性检验
+    rob = body["robustness"]
+    assert rob is not None
+    assert "deflated_sharpe_ratio" in rob and "monte_carlo" in rob
 
 
 def test_optimize_walk_forward(client):
     resp = client.post(
-        "/optimize",
+        "/api/optimize",
         json={
             "symbol": "000001",
             "start": "2022-01-03",

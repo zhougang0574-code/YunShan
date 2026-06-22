@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YunShan 量化系统 · 功能验证手册</title>
+<style>
+  :root { --blue:#2563eb; --ink:#1f2933; --muted:#7b8794; --line:#e4e7eb; --bg:#f5f7fa;
+          --good:#14794a; --warn:#b7791f; --bad:#c0392b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+         color:var(--ink); background:var(--bg); line-height:1.65; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
+  header { background:var(--ink); color:#fff; padding:28px 24px; border-radius:12px; margin-bottom:24px; }
+  header h1 { margin:0 0 6px; font-size:24px; }
+  header p { margin:0; color:#cbd2d9; font-size:14px; }
+  h2 { font-size:20px; margin:36px 0 12px; padding-bottom:8px; border-bottom:2px solid var(--blue); }
+  h3 { font-size:16px; margin:22px 0 8px; }
+  p, li { font-size:14px; }
+  code { background:#eef1f4; padding:2px 6px; border-radius:4px; font-size:13px;
+         font-family:"SFMono-Regular",Consolas,monospace; }
+  pre { background:#1f2933; color:#e4e7eb; padding:14px 16px; border-radius:8px; overflow-x:auto;
+        font-size:13px; font-family:"SFMono-Regular",Consolas,monospace; }
+  pre .c { color:#9aa5b1; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px 20px; margin:14px 0; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; margin:10px 0; }
+  th,td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:#f0f3f7; }
+  .step { counter-reset: none; }
+  .verify { background:#f0f5ff; border-left:4px solid var(--blue); padding:10px 14px; border-radius:0 6px 6px 0; margin:8px 0; }
+  .verify b { color:var(--blue); }
+  .pass { background:#e3f4ec; border-left:4px solid var(--good); padding:10px 14px; border-radius:0 6px 6px 0; margin:8px 0; }
+  .pass b { color:var(--good); }
+  .warnbox { background:#fdf3d8; border-left:4px solid var(--warn); padding:10px 14px; border-radius:0 6px 6px 0; margin:8px 0; }
+  .warnbox b { color:var(--warn); }
+  ul.chk { list-style:none; padding-left:0; }
+  ul.chk li { padding:6px 0; border-bottom:1px dashed var(--line); }
+  ul.chk input { width:16px; height:16px; margin-right:8px; vertical-align:-3px; }
+  .toc { columns:2; column-gap:32px; }
+  .toc a { color:var(--blue); text-decoration:none; font-size:13.5px; }
+  .toc a:hover { text-decoration:underline; }
+  .pill { display:inline-block; font-size:11px; padding:1px 8px; border-radius:999px; margin-left:6px; vertical-align:1px; }
+  .pill-net { background:#fce8e6; color:var(--bad); }
+  .pill-off { background:#e3f4ec; color:var(--good); }
+  .muted { color:var(--muted); }
+  kbd { background:#fff; border:1px solid #cbd2d9; border-bottom-width:2px; border-radius:4px; padding:1px 6px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>YunShan 量化系统 · 功能验证手册</h1>
+  <p>启动方式 · 功能清单 · 逐项验证步骤与判定标准 · 已知限制。供本机手工验证使用。</p>
+</header>
+
+<div class="card">
+  <b>图例：</b>
+  <span class="pill pill-net">需联网</span> 该功能依赖 akshare 拉真实行情，需网络正常（含本机代理不拦截）。
+  <span class="pill pill-off">离线可验</span> 不触网即可验证（如自动化测试）。
+</div>
+
+<h2 id="toc">目录</h2>
+<div class="toc card">
+  <a href="#env">0. 环境准备与启动</a><br>
+  <a href="#health">1. 后端健康检查与 API 文档</a><br>
+  <a href="#backtest">2. 策略回测（向量化引擎）</a><br>
+  <a href="#event">3. 事件驱动引擎 + 止损止盈</a><br>
+  <a href="#optimize">4. 参数寻优 + 稳健性检验</a><br>
+  <a href="#screening">5. 截面多因子选股</a><br>
+  <a href="#detail">6. 个股详情（报价/分时/注意点）</a><br>
+  <a href="#experiments">7. 历史记录</a><br>
+  <a href="#tests">8. 自动化测试（离线）</a><br>
+  <a href="#api">9. 纯接口验证（curl）</a><br>
+  <a href="#limits">10. 已知限制与排错</a><br>
+</div>
+
+<!-- ============ 0 ============ -->
+<h2 id="env">0. 环境准备与启动</h2>
+
+<h3>0.1 依赖</h3>
+<p>本机用全局 <code>py -3</code>（Python 3.11），无 venv。如换机器或重装，先装依赖：</p>
+<pre><span class="c"># 项目根目录 D:\CodeProject\Tools\YunShan</span>
+py -3 -m pip install -r requirements.txt
+cd frontend
+npm install
+cd ..</pre>
+
+<h3>0.2 启动（需两个终端，均在项目根目录）</h3>
+<pre><span class="c"># 终端 1：后端 API</span>
+py -3 -m uvicorn backend.main:app --reload
+
+<span class="c"># 终端 2：前端</span>
+cd frontend
+npm run dev</pre>
+
+<div class="verify"><b>验证：</b>
+  <ul class="chk">
+    <li><input type="checkbox"> 终端 1 出现 <code>Uvicorn running on http://127.0.0.1:8000</code>，无报错堆栈。</li>
+    <li><input type="checkbox"> 终端 2 出现 <code>Local: http://localhost:5173/</code>。</li>
+    <li><input type="checkbox"> 浏览器打开 <code>http://localhost:5173</code>，顶部出现深色导航栏：<b>YunShan 量化 / 策略回测 / 截面选股 / 个股详情 / 历史记录</b>。</li>
+  </ul>
+</div>
+<div class="warnbox"><b>注意：</b>行情源是国内站点，代码已自动让其直连、绕开本地代理（如 Clash 7890）。但仍需能正常访问东方财富/新浪行情。若拉数据报 502 / ProxyError，多为本机网络/代理问题，参见 <a href="#limits">第 10 节</a>。</div>
+
+<!-- ============ 1 ============ -->
+<h2 id="health">1. 后端健康检查与 API 文档 <span class="pill pill-off">离线可验</span></h2>
+<table>
+  <tr><th>操作</th><th>预期结果</th></tr>
+  <tr><td>浏览器打开 <code>http://127.0.0.1:8000/health</code></td><td>返回 <code>{"status":"ok"}</code></td></tr>
+  <tr><td>打开 <code>http://127.0.0.1:8000/docs</code></td><td>Swagger 交互文档，列出全部端点：backtest / data / strategies / optimize / universe / screening / quotes / symbols / experiments</td></tr>
+</table>
+<div class="pass"><b>判定通过：</b><code>/docs</code> 中能看到 16 个端点分组，且 <code>GET /strategies</code> 点 "Try it out → Execute" 返回 4 个策略（ma_cross / rsi_reversal / macd_trend / bollinger_revert），每个带 param_space。</div>
+
+<!-- ============ 2 ============ -->
+<h2 id="backtest">2. 策略回测（向量化引擎） <span class="pill pill-net">需联网</span></h2>
+<p>页面：<b>策略回测</b>（首页）。</p>
+<table>
+  <tr><th>步骤</th><th>操作</th></tr>
+  <tr><td>1</td><td>左侧默认：股票代码 <code>000001</code>，区间 <code>2022-01-01 ~ 2023-12-31</code>，策略 <code>ma_cross</code>，引擎"向量化（快）"。</td></tr>
+  <tr><td>2</td><td>点 <b>运行回测</b>。</td></tr>
+</table>
+<div class="verify"><b>验证（预期结果）：</b>
+  <ul class="chk">
+    <li><input type="checkbox"> 顶部出现 <code>000001 平安银行</code> 与"查看个股详情 →"链接。</li>
+    <li><input type="checkbox"> 8 张指标卡：年化收益率、超额收益、最大回撤、夏普、Sortino、Calmar、交易胜率、交易笔数；每张带 🟢/🟡/🔴/⚪ 评级徽章和一句白话点评。</li>
+    <li><input type="checkbox"> <b>数值合理性</b>：最大回撤为<u>负数</u>；年化是百分数；夏普量级一般在 -3~3；交易笔数为正整数。</li>
+    <li><input type="checkbox"> "价格+信号"图：K 线/收盘价上叠加持仓区间。</li>
+    <li><input type="checkbox"> "权益曲线"图：<b>策略净值</b>（蓝实线）与 <b>买入持有基准</b>（灰虚线）两条对比。</li>
+    <li><input type="checkbox"> 鼠标悬停指标卡的"?"显示详细解释。</li>
+  </ul>
+</div>
+<div class="pass"><b>判定通过：</b>四类视图（指标卡 / 价格信号 / 权益曲线 / 基准对比）齐全且数值合理；切换策略（如 <code>rsi_reversal</code>）后参数输入框随之变化，再次运行结果不同。</div>
+
+<!-- ============ 3 ============ -->
+<h2 id="event">3. 事件驱动引擎 + 止损止盈 <span class="pill pill-net">需联网</span></h2>
+<table>
+  <tr><th>步骤</th><th>操作</th></tr>
+  <tr><td>1</td><td>左侧"回测引擎"切换为 <b>事件驱动（支持止损止盈）</b>，会多出"止损 %""止盈 %"输入框。</td></tr>
+  <tr><td>2</td><td>先<u>留空</u>止损止盈，运行一次，记下年化/回撤。</td></tr>
+  <tr><td>3</td><td>再填 止损 <code>8</code>、止盈 <code>20</code>（单位 %），运行。</td></tr>
+</table>
+<div class="verify"><b>验证：</b>
+  <ul class="chk">
+    <li><input type="checkbox"> 两次都能正常出图出指标，无报错。</li>
+    <li><input type="checkbox"> 加了止损后，结果与不加止损<u>不同</u>（通常最大回撤变浅 / 交易笔数变化），说明止损逻辑生效。</li>
+    <li><input type="checkbox">（一致性原理）事件驱动在无成本无止损时与向量化结果一致——这点由自动化测试 <code>test_event_engine.py</code> 保证（见第 8 节），手工无需复现。</li>
+  </ul>
+</div>
+
+<!-- ============ 4 ============ -->
+<h2 id="optimize">4. 参数寻优 + 稳健性检验 <span class="pill pill-net">需联网</span></h2>
+<table>
+  <tr><th>步骤</th><th>操作</th></tr>
+  <tr><td>1</td><td>选策略 <code>ma_cross</code>（两个参数，便于看热力图），选"寻优目标指标"如 <code>sharpe_ratio</code>。</td></tr>
+  <tr><td>2</td><td>点 <b>网格寻优</b>。</td></tr>
+  <tr><td>3</td><td>点 <b>走动检验</b>。</td></tr>
+</table>
+<div class="verify"><b>验证 — 网格寻优：</b>
+  <ul class="chk">
+    <li><input type="checkbox"> 出现结果表（每行一组参数 + 各指标），按目标指标降序。</li>
+    <li><input type="checkbox"> 因 ma_cross 恰好 2 个参数，表上方出现 <b>双参数热力图</b>（颜色映射目标指标）。</li>
+    <li><input type="checkbox"> 下方出现 <b>稳健性检验</b> 面板：尝试组合数、观测 Sharpe、随机期望最高 Sharpe、<b>Deflated Sharpe（%）</b>、<b>蒙特卡洛 p 值</b>，每项带白话徽章（"很可能是真实 alpha""可能只是寻优运气""显著优于随机"等），并列出最优参数。</li>
+  </ul>
+</div>
+<div class="verify"><b>验证 — 走动检验：</b>
+  <ul class="chk">
+    <li><input type="checkbox"> 结果表每行一个 split，含样本内指标 <code>is_*</code> 与样本外 <code>oos_*</code>，可对比是否过拟合（样本内好、样本外崩）。</li>
+    <li><input type="checkbox"> 走动检验模式下<u>不</u>显示热力图/稳健性面板（仅网格模式有）。</li>
+  </ul>
+</div>
+
+<!-- ============ 5 ============ -->
+<h2 id="screening">5. 截面多因子选股 <span class="pill pill-net">需联网</span></h2>
+<p>页面：<b>截面选股</b>。</p>
+<table>
+  <tr><th>步骤</th><th>操作</th></tr>
+  <tr><td>1</td><td>"股票池"选 <b>沪深300（000300）</b>（建议先用指数，全市场较慢）。</td></tr>
+  <tr><td>2</td><td>中部"选择因子与权重"：默认已勾 <code>市盈率</code> 和 <code>60日动量</code>。可勾更多，每个可改权重。基本面因子带"基本面"绿标，技术因子带"技术"蓝标。</td></tr>
+  <tr><td>3</td><td>Top N 填 <code>30</code>。若勾了<u>技术</u>因子会多出"回看天数"输入（逐股拉历史，慢）。</td></tr>
+  <tr><td>4</td><td>点 <b>开始选股</b>。</td></tr>
+</table>
+<div class="verify"><b>验证：</b>
+  <ul class="chk">
+    <li><input type="checkbox"> 出现蓝色 <b>进度条</b> 并显示百分比（后台任务 + 每秒轮询）。仅基本面因子时几乎秒完；含技术因子会逐步推进。</li>
+    <li><input type="checkbox"> 完成后出现结果表：<code>rank / code / name / score</code> + 各因子原始值与标准化分 <code>*_z</code>。</li>
+    <li><input type="checkbox"> 按 <code>score</code> 降序；点某行 <code>code</code> 链接跳转到该股 <b>个股详情</b> 页。</li>
+    <li><input type="checkbox">（方向正确性）只勾"市盈率"（低估值优）时，排名靠前的标的 PE 普遍较低。</li>
+  </ul>
+</div>
+<div class="warnbox"><b>提示：</b>基本面因子（PE/PB/市值/换手/动量）来自一次全市场快照，快。技术因子需逐股拉价格，沪深300 全跑约数十秒到数分钟，取决于网络与缓存。</div>
+
+<!-- ============ 6 ============ -->
+<h2 id="detail">6. 个股详情（报价 / 分时 / 注意点） <span class="pill pill-net">需联网</span></h2>
+<p>页面：<b>个股详情</b>（也可从回测页/选股页跳入）。</p>
+<table>
+  <tr><th>步骤</th><th>操作</th></tr>
+  <tr><td>1</td><td>左侧输入代码（如 <code>000001</code>），点 <b>查看</b>（或回车）。</td></tr>
+</table>
+<div class="verify"><b>验证：</b>
+  <ul class="chk">
+    <li><input type="checkbox"> 顶部显示 代码 + 名称 + 最新价与涨跌幅（<b>A股配色：红涨绿跌</b>）。</li>
+    <li><input type="checkbox"> <b>注意点</b> 卡：标签化显示当前信号，如"RSI 超卖/超买""MACD 金叉/死叉""多头/空头排列""估值偏高""ROE…""主力净流入/流出"，按好/警示/差着色；每个标签带"技术/基本面/资金"分类。无触发时显示"暂无…"。</li>
+    <li><input type="checkbox"> <b>分时图</b>：当日价格曲线，附昨收虚线。<span class="muted">（盘后/非交易时段可能为空，属正常，见限制）</span></li>
+    <li><input type="checkbox"> <b>基本面</b> 表：PE(TTM)/PB/PS/股息率/总市值/ROE/毛利率/营收增速/净利增速，取不到的显示"—"。</li>
+    <li><input type="checkbox"> <b>另类数据</b> 表：主力净流入(元)/占比%/北向持股市值。</li>
+    <li><input type="checkbox"> <b>报价自动刷新</b>：交易时段内停留 60 秒，最新价会自动更新（轮询，非推送）。</li>
+  </ul>
+</div>
+
+<!-- ============ 7 ============ -->
+<h2 id="experiments">7. 历史记录 <span class="pill pill-off">离线可验</span></h2>
+<p>页面：<b>历史记录</b>。前提：已在前面跑过至少一次回测/寻优/选股（运行时自动落地到 <code>data/experiments.db</code>）。</p>
+<div class="verify"><b>验证：</b>
+  <ul class="chk">
+    <li><input type="checkbox"> 列表按时间倒序，列出 时间/类型/标的/策略/关键结果。类型含 <code>backtest</code> / <code>optimize_grid</code> / <code>optimize_walk_forward</code> / <code>screening</code>。</li>
+    <li><input type="checkbox"> 左侧按"类型"筛选、按"标的"筛选，点查询后列表相应过滤。</li>
+    <li><input type="checkbox"> 点任意一行展开，看到该次的 <b>入参</b> 与 <b>结果</b> JSON 明细。</li>
+    <li><input type="checkbox"> 回到回测页再跑一次，回到本页（点查询）能看到新增的一条记录。</li>
+  </ul>
+</div>
+
+<!-- ============ 8 ============ -->
+<h2 id="tests">8. 自动化测试（离线，不触网） <span class="pill pill-off">离线可验</span></h2>
+<p>核心逻辑正确性由 pytest 保证（数据源全部 monkeypatch，断网也能跑）。在项目根目录执行：</p>
+<pre>py -3 -m pytest -q</pre>
+<div class="pass"><b>判定通过：</b>输出 <code>65 passed</code>（1 条 warning 可忽略）。覆盖：缓存增量/复权隔离/无未来函数、成本扣减、交易级胜率、策略注册、寻优排序、walk-forward、<b>截面选股方向与权重</b>、<b>Deflated Sharpe 与蒙特卡洛</b>、<b>个股注意点信号</b>、<b>实验记录</b>、<b>事件驱动引擎与向量化一致性 + 止损止盈</b>、以及全部后端路由。</div>
+<p class="muted">必须在项目根目录 <code>D:\CodeProject\Tools\YunShan</code> 下运行；否则 pytest 可能漂到 frontend 目录报 "no tests ran"。</p>
+
+<!-- ============ 9 ============ -->
+<h2 id="api">9. 纯接口验证（可选，用 curl / 浏览器） <span class="pill pill-net">需联网</span></h2>
+<p>不想点页面时，可直接打后端接口（PowerShell 用 <code>curl.exe</code>）：</p>
+<pre><span class="c"># 列策略</span>
+curl http://127.0.0.1:8000/strategies
+
+<span class="c"># 跑一次回测</span>
+curl -X POST http://127.0.0.1:8000/backtest -H "Content-Type: application/json" ^
+  -d "{\"symbol\":\"000001\",\"start\":\"2022-01-01\",\"end\":\"2023-12-31\",\"strategy\":\"ma_cross\",\"params\":{\"short_window\":5,\"long_window\":20}}"
+
+<span class="c"># 可选因子目录 / 股票池</span>
+curl http://127.0.0.1:8000/screening/factors
+curl http://127.0.0.1:8000/universe
+
+<span class="c"># 提交选股（返回 task_id），再轮询</span>
+curl -X POST http://127.0.0.1:8000/screening -H "Content-Type: application/json" ^
+  -d "{\"universe_key\":\"index:000300\",\"factors\":[{\"key\":\"pe\",\"weight\":1}],\"top_n\":20,\"max_symbols\":300,\"lookback_days\":180}"
+curl http://127.0.0.1:8000/screening/&lt;task_id&gt;
+
+<span class="c"># 个股报价 / 信号 / 历史记录</span>
+curl http://127.0.0.1:8000/quotes/000001
+curl http://127.0.0.1:8000/symbols/000001/signals
+curl http://127.0.0.1:8000/experiments</pre>
+<div class="verify"><b>验证：</b>
+  <ul class="chk">
+    <li><input type="checkbox"> 各接口返回 JSON、HTTP 200；<code>/backtest</code> 的 <code>stats</code> 含 <code>sharpe_ratio</code>，<code>series</code> 各数组等长。</li>
+    <li><input type="checkbox"> <code>/screening</code> 先返回 <code>{"task_id":...}</code>，轮询到 <code>status:"done"</code> 后带 <code>results</code>。</li>
+  </ul>
+</div>
+
+<!-- ============ 10 ============ -->
+<h2 id="limits">10. 已知限制与排错</h2>
+<table>
+  <tr><th>现象</th><th>原因 / 处理</th></tr>
+  <tr><td>拉数据 502 / ProxyError / 连接被拒</td><td>本机网络或代理问题。代码已对行情源直连，但仍需能访问东方财富/新浪。若开了 Clash 等代理，确认其在运行；或在 <code>quant/config.py</code> 确认 <code>IGNORE_PROXY=True</code>。</td></tr>
+  <tr><td>个股详情"分时图"为空</td><td>非交易时段 / 盘后 akshare 可能无当日分时，属正常。交易日盘中再看。</td></tr>
+  <tr><td>基本面/另类数据某些字段是"—"</td><td>akshare 对应接口未取到或列名改版。适配层做了防御式降级（取不到填 NaN→显示"—"），不影响其它功能。</td></tr>
+  <tr><td>北向持股、龙虎榜等数据缺失</td><td>这类接口稳定性较弱，仅作展示标签、不参与回测；缺失不影响回测/选股主流程。</td></tr>
+  <tr><td>截面选股很慢</td><td>勾了技术因子会逐股拉历史。改用指数/行业池、减小"最多扫描股票数"、或只用基本面因子。当天拉过的数据会缓存，二次更快。</td></tr>
+  <tr><td>前端报"无法加载策略列表（后端启动了吗？）"</td><td>后端没起 / 端口不是 8000 / vite 代理被本机 HTTP 代理拦截。先确认终端 1 在跑。</td></tr>
+  <tr><td>数据缓存位置</td><td><code>data/</code> 目录（gitignore）：行情 <code>*_qfq.parquet</code>+<code>.meta.json</code>（按天失效）、股票池/快照缓存、<code>experiments.db</code>。需要重置可删除该目录内容。</td></tr>
+</table>
+
+<div class="card muted" style="margin-top:32px; font-size:13px;">
+  本手册对应 Phase 0–8 全部实现。设计与实施记录见 <code>docs/DESIGN.md</code>，运行说明见 <code>README.md</code>。
+</div>
+
+</div>
+</body>
+</html>

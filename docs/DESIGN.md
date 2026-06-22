@@ -275,4 +275,32 @@ YunShan/
   - dev 经 `/api` 代理到后端；`vite.config.ts` 强制 loopback 不走 HTTP 代理（避免本地 Clash 代理导致 502）。
   - `npm run build` 通过 tsc 类型检查；前后端联调链路（前端→vite 代理→FastAPI→quant）已实测打通。
   - 启动见根目录 `README.md`：终端1 `uvicorn backend.main:app --reload`，终端2 `cd frontend && npm run dev`，浏览器开 http://localhost:5173。
-- 至此 Phase 0–3 全部完成：核心研究能力 + 后端 API + React 前端，端到端可用。仍待后续：多标的组合、scheduler 定时更新、事件驱动引擎（Phase 4），以及股票池/基本面数据/截面选股（Phase 5）、稳健性检验（Phase 6）、个股详情/近实时报价/另类数据（Phase 7）、策略与实验记录（Phase 8）。
+- 至此 Phase 0–3 全部完成：核心研究能力 + 后端 API + React 前端，端到端可用。
+- **Phase 5 已完成**（2026-06-18）：股票池 + 基本面 + 截面选股
+  - `quant/data/daycache.py`：通用「按天失效」缓存（universe/fundamentals/altdata 共用）。
+  - `quant/data/universe.py`：全市场 / 宽基指数 / 行业板块三类候选池，列名模糊匹配统一为 code/name，按天缓存。
+  - `quant/data/fundamentals.py`：`market_snapshot()` 一次拉全市场估值/市值/换手（截面打分用）；
+    `get_fundamentals(symbol)` 单股估值+ROE+增速（个股详情用）。
+  - `quant/factors/fundamental.py`：基本面/量价快照因子目录（带 direction）。
+  - `quant/screening.py`：股票池+因子 → 截面 z-score 标准化 + 加权打分排名；技术因子经注入的
+    `price_loader` 逐股计算。后端 `backend/tasks.py` 内存后台任务 + 进度回写；
+    `/universe`、`/universe/constituents`、`/screening`（提交）、`/screening/{task_id}`（轮询）、`/screening/factors`。
+- **Phase 6 已完成**（2026-06-18）：稳健性检验
+  - `quant/robustness.py`：Deflated Sharpe Ratio（Bailey/LdP，考虑尝试次数与偏度峰度）+
+    蒙特卡洛仓位置换检验（仅用标准库 `statistics.NormalDist`，不依赖 scipy）。
+  - 网格寻优 `/optimize` 结果附 `robustness` 字段；前端寻优结果页用 `RobustnessPanel` 翻成大白话判断。
+- **Phase 7 已完成**（2026-06-18）：个股详情 + 近实时报价 + 另类数据
+  - `quant/data/quotes.py`：轮询式最新报价 + 当日分时（不缓存、近实时）。
+  - `quant/data/altdata.py`：主力资金流向 / 北向持股（展示标签，不参与回测）。
+  - `quant/signals.py`：纯函数 `evaluate(price, fundamentals, alt)` 把技术/基本面/资金面状态标签化为"注意点"。
+  - 后端 `/quotes/{symbol}`、`/quotes/{symbol}/intraday`、`/symbols/{symbol}/signals|fundamentals|altdata`；
+    前端「个股详情」页 `setInterval` 60s 轮询报价 + 分时图 + 标签卡。
+- **Phase 8 已完成**（2026-06-18）：策略与实验记录
+  - `quant/experiments.py`：SQLite 落地（`data/experiments.db`），`record()` 绝不抛错；
+    回测/寻优/选股运行处自动记录。后端 `/experiments`（倒序、按 kind/标的/策略筛选）；前端「历史记录」页可展开看入参/结果。
+- **Phase 4 已完成**（2026-06-18）：事件驱动引擎
+  - `quant/engine/event_driven.py`：逐根 K 线重放，复用 `Portfolio`+`CostModel`，支持止损/止盈（路径依赖）。
+    与向量化引擎共用策略接口（零改动）；**无成本无止损时逐日净值与向量化引擎完全一致**（有单测校验）。
+  - `runner` / `/backtest` 增加 `engine`（vectorized/event）+ `stop_loss`/`take_profit` 参数；前端回测页可切换引擎。
+- 测试：`tests/` 由 26 增至 **65 用例全绿**（截面选股、稳健性、信号、实验记录、事件驱动引擎、新后端路由均覆盖，全部离线 monkeypatch 数据源）。前端 `npm run build`（tsc 类型检查 + vite）通过。
+- 仍待后续（设计已记录，本次未做）：scheduler 定时增量更新、多标的组合、美股数据源、龙虎榜/十大流通股东等更多另类数据接口。

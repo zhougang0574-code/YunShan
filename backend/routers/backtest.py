@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from quant import get_daily, run_strategy_backtest
 from quant.data import get_name
+from quant.experiments import record as record_experiment
 
 from ..schemas import BacktestRequest, BacktestResponse, BacktestSeries
 
@@ -20,11 +21,30 @@ def run(req: BacktestRequest) -> BacktestResponse:
         raise HTTPException(status_code=404, detail="未获取到数据")
 
     try:
-        result, stats = run_strategy_backtest(price, req.strategy, req.params)
+        result, stats = run_strategy_backtest(
+            price,
+            req.strategy,
+            req.params,
+            engine=req.engine,
+            stop_loss=req.stop_loss,
+            take_profit=req.take_profit,
+        )
     except KeyError as err:  # 未知策略
         raise HTTPException(status_code=400, detail=str(err)) from err
     except (ValueError, TypeError) as err:  # 参数非法
         raise HTTPException(status_code=422, detail=f"参数不合法：{err}") from err
+
+    record_experiment(
+        kind="backtest",
+        symbol=req.symbol,
+        strategy=req.strategy,
+        params={"params": req.params, "start": req.start, "end": req.end},
+        summary={
+            k: stats[k]
+            for k in ("annualized_return", "sharpe_ratio", "max_drawdown", "excess_return")
+            if k in stats
+        },
+    )
 
     series = BacktestSeries(
         dates=[str(d.date()) for d in result.index],

@@ -12,9 +12,50 @@ body {
   margin: 0;
 }
 
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 20px;
+  background: #1f2933;
+  color: #fff;
+}
+
+.navbar .brand {
+  font-size: 17px;
+  font-weight: 700;
+  margin-right: 16px;
+}
+
+.nav-link {
+  color: #cbd2d9;
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.nav-link:hover {
+  background: #323f4b;
+  color: #fff;
+}
+
+.nav-link.active {
+  background: #2563eb;
+  color: #fff;
+}
+
 .app {
   display: flex;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
 }
 
 .sidebar {
@@ -226,4 +267,232 @@ td:first-child {
 
 .muted {
   color: #7b8794;
+}
+
+.result-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 13px;
+}
+.result-link:hover {
+  text-decoration: underline;
+}
+
+/* 涨跌配色（A股惯例：红涨绿跌） */
+.price-up {
+  color: #c0392b;
+}
+.price-down {
+  color: #14794a;
+}
+
+/* 选股因子选择 */
+.factor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.factor-item {
+  border: 1px solid #e4e7eb;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.factor-item.on {
+  border-color: #2563eb;
+  background: #f0f5ff;
+}
+.factor-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: #1f2933;
+  cursor: pointer;
+}
+.factor-item input[type="checkbox"] {
+  width: auto;
+}
+.factor-item .weight {
+  margin-top: 6px;
+  width: 100%;
+}
+.tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-left: auto;
+}
+.tag-fundamental {
+  background: #e3f4ec;
+  color: #14794a;
+}
+.tag-technical {
+  background: #e8eefc;
+  color: #2563eb;
+}
+
+/* 进度条 */
+.progress {
+  height: 10px;
+  background: #eef1f4;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: #2563eb;
+  transition: width 0.3s;
+}
+
+/* 个股注意点标签 */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.signal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.signal-tag .tag-cat {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.level-good {
+  background: #fce8e6;
+  color: #c0392b;
+  border-color: #f5c6c0;
+}
+.level-bad {
+  background: #e3f4ec;
+  color: #14794a;
+  border-color: #c0e6d3;
+}
+.level-warn {
+  background: #fdf3d8;
+  color: #b7791f;
+  border-color: #f3e0a8;
+}
+.level-info {
+  background: #eef1f4;
+  color: #52606d;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+/* 登录页 */
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1f2933;
+}
+.login-card {
+  width: 340px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 28px 28px 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+.login-brand {
+  margin: 0;
+  font-size: 22px;
+  color: #1f2933;
+}
+.login-card button {
+  margin-top: 20px;
+}
+.login-switch {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: #7b8794;
+  text-align: center;
+}
+.login-switch a {
+  color: #2563eb;
+  cursor: pointer;
+  margin-left: 6px;
+}
+.login-switch a:hover {
+  text-decoration: underline;
+}
+.remember-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: #52606d;
+  cursor: pointer;
+}
+.remember-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+/* 导航栏右侧用户区 */
+.nav-user {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #cbd2d9;
+}
+.nav-logout {
+  color: #9aa5b1;
+  cursor: pointer;
+}
+.nav-logout:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+/* 收藏按钮（个股详情页） */
+.fav-btn {
+  width: auto;
+  margin-top: 0;
+  padding: 6px 14px;
+  background: #fff;
+  color: #b7791f;
+  border: 1px solid #f3e0a8;
+  font-size: 13px;
+}
+.fav-btn.on {
+  background: #fdf3d8;
+  color: #b7791f;
+  border-color: #e6c44d;
+}
+
+/* 历史记录展开 */
+tr.clickable {
+  cursor: pointer;
+}
+tr.clickable:hover {
+  background: #f5f7fa;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  text-align: left;
+}
+.detail-grid pre {
+  background: #f5f7fa;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
 }

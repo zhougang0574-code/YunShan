@@ -28,6 +28,9 @@ class BacktestRequest(BaseModel):
     strategy: str = Field(..., examples=["ma_cross"])
     params: dict[str, Any] = Field(default_factory=dict)
     adjust: str = config.DEFAULT_ADJUST
+    engine: Literal["vectorized", "event"] = "vectorized"
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
 
 class BacktestSeries(BaseModel):
@@ -67,3 +70,62 @@ class OptimizeResponse(BaseModel):
     metric: str
     mode: str
     results: list[dict[str, Any]]
+    robustness: dict[str, Any] | None = None
+
+
+# ---- 股票池 / 截面选股 ----
+
+
+class FactorSpec(BaseModel):
+    key: str
+    weight: float = 1.0
+
+
+class ScreeningRequest(BaseModel):
+    universe_key: str = Field("index:000300", examples=["index:000300"])
+    factors: list[FactorSpec] = Field(..., min_length=1)
+    top_n: int = 50
+    max_symbols: int = 300
+    lookback_days: int = 180
+
+
+class TaskSubmitResponse(BaseModel):
+    task_id: str
+
+
+# ---- 登录 / 用户 ----
+
+
+class AuthRequest(BaseModel):
+    username: str = Field(..., min_length=2, max_length=32, examples=["alice"])
+    password: str = Field(..., min_length=4, max_length=128)
+
+
+class AuthResponse(BaseModel):
+    token: str
+    username: str
+
+
+class MeResponse(BaseModel):
+    username: str
+
+
+# ---- 收藏 ----
+
+
+class AddFavoriteRequest(BaseModel):
+    symbol: str = Field(..., examples=["000001"])
+
+
+class FavoriteItem(BaseModel):
+    symbol: str
+    name: str = ""
+    created_at: str
+
+
+class ScreeningStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    progress: float
+    error: str | None = None
+    results: list[dict[str, Any]] | None = None

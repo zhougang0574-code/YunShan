@@ -42,8 +42,9 @@ if IGNORE_PROXY:
 # ---- 数据源 ----
 # akshare 拉取的复权方式默认值："qfq"(前复权)/"hfq"(后复权)/""(不复权)
 DEFAULT_ADJUST = "qfq"
-# akshare 请求失败时的重试次数与退避秒数（东财偶发断连，多试几次成功率更高）
-FETCH_MAX_RETRIES = 5
+# 每个数据源失败时的重试次数与退避秒数。fetcher 有主备多源（东财→新浪），
+# 单源重试不宜过多，否则主源不可用时要等很久才回退；3 次足够覆盖偶发断连。
+FETCH_MAX_RETRIES = 3
 FETCH_RETRY_BACKOFF = 1.5
 
 # ---- 交易成本默认值（A股）----

@@ -9,7 +9,8 @@ process.env.NO_PROXY = process.env.NO_PROXY
   : loopback;
 process.env.no_proxy = process.env.NO_PROXY;
 
-// 开发时把 /api 代理到 FastAPI 后端，前端代码统一用 /api 前缀调用。
+// 开发时（npm run dev）把 /api 代理到 FastAPI 后端。后端业务接口本身就挂在
+// /api 前缀下，因此这里不再 rewrite，dev 与一键生产模式路径完全一致。
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -18,7 +19,6 @@ export default defineConfig({
       "/api": {
         target: "http://127.0.0.1:8000",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },
