@@ -123,6 +123,21 @@ class FavoriteItem(BaseModel):
     created_at: str
 
 
+# ---- 标的库（全量浏览）----
+
+
+class CatalogItem(BaseModel):
+    symbol: str
+    name: str = ""
+
+
+class CatalogPage(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[CatalogItem]
+
+
 class ScreeningStatusResponse(BaseModel):
     task_id: str
     status: str

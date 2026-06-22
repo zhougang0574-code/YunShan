@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from .routers import (
     auth,
     backtest,
+    catalog,
     data,
     experiments,
     favorites,
@@ -65,6 +66,7 @@ for _router in (
     experiments.router,
     auth.router,
     favorites.router,
+    catalog.router,
 ):
     app.include_router(_router, prefix="/api")
 

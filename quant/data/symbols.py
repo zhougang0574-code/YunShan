@@ -71,3 +71,34 @@ def get_name(symbol: str) -> str:
     if is_fund(symbol):
         return _load_funds().get(symbol, "")
     return _load().get(symbol, "")
+
+
+def list_symbols(
+    kind: str = "stock", query: str = "", page: int = 1, page_size: int = 20
+) -> dict:
+    """分页列出全部个股或基金/ETF（code + name），支持按代码/名称模糊搜索。
+
+    返回 {total, page, page_size, items:[{symbol, name}]}。数据来自本地缓存表
+    （首次会拉取并缓存），不可用时返回空列表，不报错。
+    """
+    table = _load_funds() if kind == "fund" else _load()
+    items = [{"symbol": c, "name": n} for c, n in table.items()]
+    items.sort(key=lambda it: it["symbol"])
+
+    q = query.strip().lower()
+    if q:
+        items = [
+            it for it in items
+            if q in it["symbol"].lower() or q in str(it["name"]).lower()
+        ]
+
+    total = len(items)
+    page = max(1, page)
+    page_size = max(1, min(page_size, 200))
+    start = (page - 1) * page_size
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": items[start : start + page_size],
+    }

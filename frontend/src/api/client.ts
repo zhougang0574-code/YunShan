@@ -339,3 +339,31 @@ export function addFavorite(symbol: string): Promise<Favorite[]> {
 export function removeFavorite(symbol: string): Promise<Favorite[]> {
   return request<Favorite[]>(`/favorites/${symbol}`, { method: "DELETE" });
 }
+
+// ---- 标的库（全量浏览：股票 / 基金）----
+
+export interface CatalogItem {
+  symbol: string;
+  name: string;
+}
+export interface CatalogPage {
+  total: number;
+  page: number;
+  page_size: number;
+  items: CatalogItem[];
+}
+
+export function getCatalog(
+  kind: "stock" | "fund",
+  query: string,
+  page: number,
+  pageSize: number
+): Promise<CatalogPage> {
+  const q = new URLSearchParams({
+    kind,
+    query,
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  return request<CatalogPage>(`/catalog?${q.toString()}`);
+}
