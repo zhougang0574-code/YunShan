@@ -6,16 +6,60 @@
 由上层降级展示。
 """
 
+import time
+
 import pandas as pd
 
+from .instruments import is_fund
 
-def _market(symbol: str) -> str:
-    """按代码前缀粗判交易所：6→sh，否则 sz（北交所 8/4 暂归 bj）。"""
-    if symbol.startswith("6"):
-        return "sh"
-    if symbol.startswith(("4", "8")):
-        return "bj"
-    return "sz"
+
+def _f(v) -> float | None:
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        return None
+
+
+# 场内基金/ETF 实时快照（新浪全表），短 TTL 进程内缓存，避免分钟级轮询每次拉全表。
+_ETF_SPOT_TTL = 30  # 秒
+_etf_spot_cache: dict = {"ts": 0.0, "df": None}
+
+
+def _etf_spot() -> pd.DataFrame:
+    now = time.time()
+    if _etf_spot_cache["df"] is not None and now - _etf_spot_cache["ts"] < _ETF_SPOT_TTL:
+        return _etf_spot_cache["df"]
+    import akshare as ak
+
+    df = ak.fund_etf_category_sina(symbol="ETF基金").copy()
+    df["__code"] = df["代码"].astype(str).str[-6:]
+    _etf_spot_cache.update(ts=now, df=df)
+    return df
+
+
+def _fund_quote(symbol: str, result: dict) -> dict:
+    """ETF 报价：用新浪 ETF 实时全表过滤出本只。"""
+    try:
+        df = _etf_spot()
+        row = df[df["__code"] == symbol]
+        if not row.empty:
+            r = row.iloc[0]
+            mapping = {
+                "最新价": "price",
+                "涨跌幅": "pct_chg",
+                "今开": "open",
+                "最高": "high",
+                "最低": "low",
+                "昨收": "prev_close",
+                "成交量": "volume",
+                "成交额": "amount",
+            }
+            for zh, en in mapping.items():
+                if zh in r.index:
+                    result[en] = _f(r[zh])
+    except Exception:
+        pass
+    return result
 
 
 def get_quote(symbol: str) -> dict:
@@ -31,6 +75,8 @@ def get_quote(symbol: str) -> dict:
         "volume": None,
         "amount": None,
     }
+    if is_fund(symbol):
+        return _fund_quote(symbol, result)
     try:
         import akshare as ak
 
@@ -49,10 +95,7 @@ def get_quote(symbol: str) -> dict:
         }
         for zh, en in mapping.items():
             if zh in kv:
-                try:
-                    result[en] = float(kv[zh])
-                except (ValueError, TypeError):
-                    pass
+                result[en] = _f(kv[zh])
     except Exception:
         pass
     return result

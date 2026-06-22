@@ -15,6 +15,7 @@ import math
 import pandas as pd
 
 from . import daycache
+from .instruments import is_fund
 
 # 全市场快照里我们关心的列（akshare 中文列名 -> 标准名）
 _SNAPSHOT_COLS = {
@@ -92,6 +93,9 @@ def get_fundamentals(symbol: str, use_cache: bool = True) -> dict:
         "revenue_yoy": float("nan"),
         "profit_yoy": float("nan"),
     }
+    # 基金/ETF 没有个股财务指标，直接返回空值，跳过逐股慢接口。
+    if is_fund(symbol):
+        return result
     try:
         import akshare as ak
 

@@ -8,7 +8,7 @@
 import pandas as pd
 
 from . import daycache
-from .quotes import _market
+from .instruments import market
 
 
 def fund_flow(symbol: str, use_cache: bool = True) -> dict:
@@ -23,7 +23,7 @@ def fund_flow(symbol: str, use_cache: bool = True) -> dict:
     try:
         import akshare as ak
 
-        df = ak.stock_individual_fund_flow(stock=symbol, market=_market(symbol))
+        df = ak.stock_individual_fund_flow(stock=symbol, market=market(symbol))
         if df is not None and not df.empty:
             row = df.iloc[-1]
             date_col = next((c for c in df.columns if "日期" in str(c)), None)

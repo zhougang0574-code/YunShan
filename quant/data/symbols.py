@@ -8,9 +8,13 @@
 import pandas as pd
 
 from .. import config
+from .instruments import is_fund
 
 _CACHE = config.DATA_DIR / "symbol_names.parquet"
 _TABLE: dict[str, str] | None = None
+
+_FUND_CACHE = config.DATA_DIR / "fund_names.parquet"
+_FUND_TABLE: dict[str, str] | None = None
 
 
 def _load() -> dict[str, str]:
@@ -34,6 +38,36 @@ def _load() -> dict[str, str]:
     return _TABLE
 
 
+def _load_funds() -> dict[str, str]:
+    """场内基金/ETF 代码→名称表（新浪，去掉 sh/sz 前缀后按 6 位代码键）。"""
+    global _FUND_TABLE
+    if _FUND_TABLE is not None:
+        return _FUND_TABLE
+
+    config.DATA_DIR.mkdir(exist_ok=True)
+    if _FUND_CACHE.exists():
+        df = pd.read_parquet(_FUND_CACHE)
+    else:
+        try:
+            import akshare as ak
+
+            raw = ak.fund_etf_category_sina(symbol="ETF基金")  # 列含 代码/名称
+            df = pd.DataFrame(
+                {
+                    "code": raw["代码"].astype(str).str[-6:],
+                    "name": raw["名称"].astype(str),
+                }
+            )
+            df.to_parquet(_FUND_CACHE)
+        except Exception:
+            return {}
+
+    _FUND_TABLE = dict(zip(df["code"].astype(str), df["name"]))
+    return _FUND_TABLE
+
+
 def get_name(symbol: str) -> str:
-    """返回股票名称，查不到（或无网）则返回空串。"""
+    """返回标的名称（个股或基金/ETF），查不到（或无网）则返回空串。"""
+    if is_fund(symbol):
+        return _load_funds().get(symbol, "")
     return _load().get(symbol, "")
