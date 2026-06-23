@@ -303,4 +303,24 @@ YunShan/
     与向量化引擎共用策略接口（零改动）；**无成本无止损时逐日净值与向量化引擎完全一致**（有单测校验）。
   - `runner` / `/backtest` 增加 `engine`（vectorized/event）+ `stop_loss`/`take_profit` 参数；前端回测页可切换引擎。
 - 测试：`tests/` 由 26 增至 **65 用例全绿**（截面选股、稳健性、信号、实验记录、事件驱动引擎、新后端路由均覆盖，全部离线 monkeypatch 数据源）。前端 `npm run build`（tsc 类型检查 + vite）通过。
+- **Phase 9 — 一键化 + 个人化 + 模拟盘**（2026-06-23，超出原 Phase 0–8 规划的增量交付）：
+  - **一键启动**：改为单进程同时服务 `/api/*` 与打包后的 React 前端（`backend/main.py` 挂 SPA 回退 +
+    所有业务路由统一 `/api` 前缀）；`run.py` / `start.bat` 自动构建前端再起服务，端口 8000。
+    Streamlit 入口与"前后端分离两终端"启动方式弃用。
+  - **数据源回退**：东财（eastmoney）在部分网络环境被掐断，`quant/data/fetcher.py`/`quotes.py`/
+    `fundamentals.py` 改走新浪/百度（`stock_zh_a_spot`/`fund_etf_category_sina`/`stock_zh_a_minute`/
+    `stock_zh_valuation_baidu`/`stock_financial_abstract`），多源按 kind 记忆首选源并回退。
+    新增 `quant/data/instruments.py`（`market()`/`is_fund()`）区分市场与股票/场内基金。
+  - **登录 + 收藏（按用户隔离）**：`quant/users.py`（SQLite + pbkdf2 口令哈希 + token），
+    `backend/routers/auth.py`/`favorites.py`，`backend/deps.py` 解析 Bearer token；前端 `auth.tsx`
+    登录页 + "记住我"（凭据存浏览器）。
+  - **标的库**：`quant/data/symbols.py` 的 `list_symbols(kind,query,page,page_size)` 分页+模糊搜索，
+    后端 `/catalog`，前端「标的库」页（股票/基金双 Tab）。
+  - **个股详情 / 回测支持场内基金 / ETF**：报价、名称、基本面按 `is_fund` 分流。
+  - **模拟交易（虚拟练习盘）**：`quant/paper.py`（按用户隔离的 SQLite：账户/持仓/成交/每日净值，
+    100 股整手 + `CostModel` 真实 A 股费用，ETF 免印花税，已实现/浮动盈亏）；
+    后端 `backend/routers/paper.py`（`/paper/account`、`/order`、`/trades`、`/equity`、`/reset`，
+    取最新价撮合、记当日净值）；前端「模拟交易」页（账户总览 + 下单 + 持仓盈亏 + 净值曲线 + 成交记录）。
+    这是设计里"实盘/模拟盘对接"中**纯模拟、不接券商**的轻量子集，不涉及真实下单/撮合/资金安全。
+  - 测试：`tests/` 增至 **85 用例全绿**（新增 auth/catalog/etf/个股详情/模拟交易，全部离线）。
 - 仍待后续（设计已记录，本次未做）：scheduler 定时增量更新、多标的组合、美股数据源、龙虎榜/十大流通股东等更多另类数据接口。
