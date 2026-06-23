@@ -5,12 +5,14 @@ import StockDetailPage from "./pages/StockDetailPage";
 import ExperimentsPage from "./pages/ExperimentsPage";
 import FavoritesPage from "./pages/FavoritesPage";
 import BrowsePage from "./pages/BrowsePage";
+import PaperPage from "./pages/PaperPage";
 import LoginPage from "./pages/LoginPage";
 import { useAuth } from "./auth";
 
 const NAV = [
   { to: "/", label: "策略回测", end: true },
   { to: "/browse", label: "标的库" },
+  { to: "/paper", label: "模拟交易" },
   { to: "/screening", label: "截面选股" },
   { to: "/stock", label: "个股详情" },
   { to: "/favorites", label: "我的收藏" },
@@ -47,6 +49,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<BacktestPage />} />
         <Route path="/browse" element={<BrowsePage />} />
+        <Route path="/paper" element={<PaperPage />} />
         <Route path="/screening" element={<ScreeningPage />} />
         <Route path="/stock" element={<StockDetailPage />} />
         <Route path="/stock/:symbol" element={<StockDetailPage />} />

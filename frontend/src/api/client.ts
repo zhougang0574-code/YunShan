@@ -367,3 +367,74 @@ export function getCatalog(
   });
   return request<CatalogPage>(`/catalog?${q.toString()}`);
 }
+
+// ---- 模拟交易 ----
+
+export interface PaperPosition {
+  symbol: string;
+  name: string;
+  shares: number;
+  avg_cost: number;
+  price: number | null;
+  market_value: number;
+  cost: number;
+  unrealized: number;
+  unrealized_pct: number;
+}
+
+export interface PaperAccount {
+  cash: number;
+  initial: number;
+  market_value: number;
+  total: number;
+  profit: number;
+  profit_pct: number;
+  positions: PaperPosition[];
+}
+
+export interface PaperTrade {
+  ts: string;
+  symbol: string;
+  name: string | null;
+  side: "buy" | "sell";
+  price: number;
+  shares: number;
+  amount: number;
+  fee: number;
+  realized: number;
+}
+
+export interface EquityPoint {
+  date: string;
+  total: number;
+}
+
+export function getPaperAccount(): Promise<PaperAccount> {
+  return request<PaperAccount>("/paper/account");
+}
+
+export function placePaperOrder(
+  symbol: string,
+  side: "buy" | "sell",
+  shares: number
+): Promise<{ fill: Record<string, number | string>; account: PaperAccount }> {
+  return request("/paper/order", {
+    method: "POST",
+    body: JSON.stringify({ symbol, side, shares }),
+  });
+}
+
+export function getPaperTrades(): Promise<PaperTrade[]> {
+  return request<PaperTrade[]>("/paper/trades");
+}
+
+export function getPaperEquity(): Promise<EquityPoint[]> {
+  return request<EquityPoint[]>("/paper/equity");
+}
+
+export function resetPaperAccount(initial?: number): Promise<PaperAccount> {
+  return request<PaperAccount>("/paper/reset", {
+    method: "POST",
+    body: JSON.stringify({ initial: initial ?? null }),
+  });
+}

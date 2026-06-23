@@ -138,6 +138,19 @@ class CatalogPage(BaseModel):
     items: list[CatalogItem]
 
 
+# ---- 模拟交易 ----
+
+
+class OrderRequest(BaseModel):
+    symbol: str = Field(..., examples=["000001"])
+    side: Literal["buy", "sell"]
+    shares: int = Field(..., gt=0, examples=[100])
+
+
+class ResetRequest(BaseModel):
+    initial: float | None = Field(default=None, gt=0)
+
+
 class ScreeningStatusResponse(BaseModel):
     task_id: str
     status: str

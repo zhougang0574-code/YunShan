@@ -23,6 +23,7 @@ from .routers import (
     experiments,
     favorites,
     optimize,
+    paper,
     quotes,
     screening,
     strategies,
@@ -67,6 +68,7 @@ for _router in (
     auth.router,
     favorites.router,
     catalog.router,
+    paper.router,
 ):
     app.include_router(_router, prefix="/api")
 

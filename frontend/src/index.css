@@ -645,3 +645,66 @@ tr.clickable:hover {
   overflow-x: auto;
   white-space: pre-wrap;
 }
+
+/* 模拟交易 */
+.notice {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 20px;
+}
+.paper-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 28px;
+}
+.paper-summary .stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.paper-summary .stat-label {
+  font-size: 18px;
+  color: #52606d;
+}
+.paper-summary .stat-value {
+  font-size: 26px;
+  font-weight: 700;
+}
+.order-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+.order-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 18px;
+  color: #52606d;
+}
+.order-form input,
+.order-form select {
+  width: 160px;
+}
+.order-form button {
+  width: auto;
+  margin-top: 0;
+  padding: 11px 26px;
+}
+button.ghost {
+  width: auto;
+  margin-top: 0;
+  padding: 9px 20px;
+  background: #fff;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+button.ghost:hover {
+  background: #fef2f2;
+}
