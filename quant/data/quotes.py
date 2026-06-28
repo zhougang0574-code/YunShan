@@ -93,7 +93,7 @@ def get_intraday(symbol: str) -> pd.DataFrame:
 
         raw = ak.stock_zh_a_minute(symbol=f"{market(symbol)}{symbol}", period="1", adjust="")
         if raw is None or raw.empty:
-            return pd.DataFrame(columns=["time", "price", "volume"])
+            return pd.DataFrame(columns=["date", "time", "price", "volume"])
         df = raw.copy()
         df["day"] = df["day"].astype(str)
         # 分钟线含最近若干交易日，这里只取最新一个交易日
@@ -101,6 +101,7 @@ def get_intraday(symbol: str) -> pd.DataFrame:
         today = df[df["day"].str.startswith(last_date)]
         out = pd.DataFrame(
             {
+                "date": last_date,  # 该分时数据所属交易日（YYYY-MM-DD）
                 "time": today["day"].str.slice(11, 16),
                 "price": pd.to_numeric(today["close"], errors="coerce"),
                 "volume": pd.to_numeric(today["volume"], errors="coerce"),
@@ -108,4 +109,4 @@ def get_intraday(symbol: str) -> pd.DataFrame:
         )
         return out.reset_index(drop=True)
     except Exception:
-        return pd.DataFrame(columns=["time", "price", "volume"])
+        return pd.DataFrame(columns=["date", "time", "price", "volume"])

@@ -206,8 +206,13 @@ function fmt(v: number | string | null | undefined): string {
 
 function IntradayChart({ data, prevClose }: { data: IntradayPoint[]; prevClose: number | null }) {
   if (!data.length) return <p className="muted">暂无分时数据（盘后或数据源未取到）。</p>;
+  const tradeDate = data[0]?.date;
   const option = {
-    title: { text: "当日分时", left: "center", textStyle: { fontSize: 14 } },
+    title: {
+      text: tradeDate ? `分时（${tradeDate}）` : "分时",
+      left: "center",
+      textStyle: { fontSize: 14 },
+    },
     tooltip: { trigger: "axis" },
     grid: { left: 60, right: 20, top: 40, bottom: 40 },
     xAxis: { type: "category", data: data.map((d) => d.time), axisLabel: { show: false } },

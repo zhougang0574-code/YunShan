@@ -230,6 +230,7 @@ export function getQuote(symbol: string): Promise<Quote> {
 }
 
 export interface IntradayPoint {
+  date?: string;
   time: string;
   price: number | null;
   volume: number | null;
