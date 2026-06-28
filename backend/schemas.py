@@ -89,6 +89,14 @@ class ScreeningRequest(BaseModel):
     lookback_days: int = 180
 
 
+class LeadersRequest(BaseModel):
+    """板块当月涨幅榜：选定行业板块，按成分股当月至今涨幅排名。"""
+
+    industries: list[str] = Field(..., min_length=1, examples=[["半导体", "光伏设备"]])
+    top_n: int = 30
+    max_symbols: int = 300
+
+
 class TaskSubmitResponse(BaseModel):
     task_id: str
 

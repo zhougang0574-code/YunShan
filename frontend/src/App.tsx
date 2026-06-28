@@ -1,6 +1,7 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 import BacktestPage from "./pages/BacktestPage";
 import ScreeningPage from "./pages/ScreeningPage";
+import LeadersPage from "./pages/LeadersPage";
 import StockDetailPage from "./pages/StockDetailPage";
 import ExperimentsPage from "./pages/ExperimentsPage";
 import FavoritesPage from "./pages/FavoritesPage";
@@ -14,6 +15,7 @@ const NAV = [
   { to: "/browse", label: "标的库" },
   { to: "/paper", label: "模拟交易" },
   { to: "/screening", label: "截面选股" },
+  { to: "/leaders", label: "涨幅榜" },
   { to: "/stock", label: "个股详情" },
   { to: "/favorites", label: "我的收藏" },
   { to: "/experiments", label: "历史记录" },
@@ -51,6 +53,7 @@ export default function App() {
         <Route path="/browse" element={<BrowsePage />} />
         <Route path="/paper" element={<PaperPage />} />
         <Route path="/screening" element={<ScreeningPage />} />
+        <Route path="/leaders" element={<LeadersPage />} />
         <Route path="/stock" element={<StockDetailPage />} />
         <Route path="/stock/:symbol" element={<StockDetailPage />} />
         <Route path="/favorites" element={<FavoritesPage />} />

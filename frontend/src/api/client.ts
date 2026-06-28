@@ -210,6 +210,26 @@ export function getScreeningStatus(taskId: string): Promise<ScreeningStatus> {
   return request<ScreeningStatus>(`/screening/${taskId}`);
 }
 
+// ---- 板块当月涨幅榜（龙头股）----
+
+export interface LeadersRequest {
+  industries: string[];
+  top_n: number;
+  max_symbols: number;
+}
+
+// 任务状态结构与截面选股一致（results 列：rank/code/name/industry/month_pct/...）。
+export function submitLeaders(req: LeadersRequest): Promise<{ task_id: string }> {
+  return request<{ task_id: string }>("/leaders", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+export function getLeadersStatus(taskId: string): Promise<ScreeningStatus> {
+  return request<ScreeningStatus>(`/leaders/${taskId}`);
+}
+
 // ---- 个股详情 / 报价 / 信号 / 另类数据 ----
 
 export interface Quote {
