@@ -284,6 +284,48 @@ export function getAltData(symbol: string): Promise<AltData> {
   return request<AltData>(`/symbols/${symbol}/altdata`);
 }
 
+// ---- AI 智能分析 ----
+
+export interface AiChecklistItem {
+  item: string;
+  status: "pass" | "warn" | "fail";
+}
+
+export interface AiReportBody {
+  conclusion: string;
+  score: number | null;
+  trend: string;
+  confidence: string;
+  summary: string;
+  key_points: string[];
+  risks: string[];
+  catalysts: string[];
+  operation: { holder: string; empty: string };
+  checklist: AiChecklistItem[];
+  data_limitations: string[];
+}
+
+export interface AiReport {
+  symbol: string;
+  name: string;
+  generated_at: string;
+  model: string;
+  availability: Record<string, "available" | "partial" | "missing">;
+  quote: Record<string, number | string | null>;
+  report: AiReportBody;
+}
+
+export function getAiStatus(): Promise<{ enabled: boolean; model: string }> {
+  return request<{ enabled: boolean; model: string }>("/ai/status");
+}
+
+export function generateAiReport(symbol: string): Promise<AiReport> {
+  return request<AiReport>("/ai/report", {
+    method: "POST",
+    body: JSON.stringify({ symbol }),
+  });
+}
+
 // ---- 实验记录 ----
 
 export interface Experiment {

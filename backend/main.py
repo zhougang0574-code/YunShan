@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from .routers import (
+    ai,
     auth,
     backtest,
     catalog,
@@ -71,6 +72,7 @@ for _router in (
     favorites.router,
     catalog.router,
     paper.router,
+    ai.router,
 ):
     app.include_router(_router, prefix="/api")
 

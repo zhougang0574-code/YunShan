@@ -1,3 +1,6 @@
+# ---- 密钥 / 本地配置（含大模型 API Key，绝不入库）----
+.env
+
 # ---- Python ----
 .venv/
 __pycache__/

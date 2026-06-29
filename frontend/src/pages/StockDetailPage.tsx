@@ -3,7 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
 import {
   addFavorite,
+  AiReport,
   AltData,
+  generateAiReport,
+  getAiStatus,
   getAltData,
   getFavorites,
   getFundamentals,
@@ -45,6 +48,28 @@ export default function StockDetailPage() {
   const [favSymbols, setFavSymbols] = useState<Set<string>>(new Set());
   const quoteTimer = useRef<number | null>(null);
 
+  // AI 智能分析
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiReport, setAiReport] = useState<AiReport | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+
+  useEffect(() => {
+    getAiStatus().then((s) => setAiEnabled(s.enabled)).catch(() => setAiEnabled(false));
+  }, []);
+
+  async function runAiReport() {
+    setAiLoading(true);
+    setAiError("");
+    try {
+      setAiReport(await generateAiReport(symbol));
+    } catch (e) {
+      setAiError((e as Error).message);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   // 收藏集合（进页面加载一次，收藏/取消后同步更新）
   useEffect(() => {
     getFavorites()
@@ -75,6 +100,8 @@ export default function StockDetailPage() {
     setError("");
     setTags([]);
     setAlt(null);
+    setAiReport(null);
+    setAiError("");
 
     const loadQuote = () => {
       getQuote(symbol).then((q) => !cancelled && setQuote(q)).catch(() => {});
@@ -134,6 +161,25 @@ export default function StockDetailPage() {
           </button>
         </div>
 
+        {aiEnabled && (
+          <div className="panel">
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <h3 style={{ margin: 0 }}>🤖 AI 智能分析</h3>
+              <button onClick={runAiReport} disabled={aiLoading}>
+                {aiLoading ? "生成中…" : aiReport ? "重新生成" : "生成 AI 分析报告"}
+              </button>
+              <span className="muted" style={{ fontSize: 12, marginLeft: "auto" }}>
+                基于系统已有数据，仅供研究参考，不构成投资建议
+              </span>
+            </div>
+            {aiError && <div className="error" style={{ marginTop: 12 }}>{aiError}</div>}
+            {aiLoading && !aiReport && (
+              <p className="muted" style={{ marginTop: 12 }}>正在调用大模型分析，请稍候（通常十几秒）…</p>
+            )}
+            {aiReport && <AiReportCard data={aiReport} />}
+          </div>
+        )}
+
         <div className="panel">
           <h3>注意点</h3>
           {tags.length ? (
@@ -191,6 +237,96 @@ export default function StockDetailPage() {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function AiReportCard({ data }: { data: AiReport }) {
+  const r = data.report;
+  const concColor =
+    r.conclusion === "买入" ? "#16a34a" : r.conclusion === "卖出" ? "#dc2626" : "#d97706";
+  const availLabel: Record<string, string> = { available: "完整", partial: "部分", missing: "缺失" };
+  const checkIcon: Record<string, string> = { pass: "✅", warn: "⚠️", fail: "❌" };
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <span
+          style={{
+            background: concColor,
+            color: "#fff",
+            padding: "4px 14px",
+            borderRadius: 6,
+            fontWeight: 700,
+            fontSize: 16,
+          }}
+        >
+          {r.conclusion}
+        </span>
+        {r.score != null && (
+          <span style={{ fontSize: 15 }}>
+            评分 <b style={{ color: concColor }}>{r.score}</b>
+          </span>
+        )}
+        <span style={{ fontSize: 14 }}>趋势：{r.trend}</span>
+        <span style={{ fontSize: 14 }}>置信度：{r.confidence}</span>
+      </div>
+
+      {r.summary && <p style={{ fontSize: 15, margin: "12px 0", fontWeight: 600 }}>💬 {r.summary}</p>}
+
+      <AiList title="📰 信息速览" items={r.key_points} />
+      <AiList title="🚨 风险警报" items={r.risks} color="#dc2626" />
+      <AiList title="✨ 利好催化" items={r.catalysts} color="#16a34a" />
+
+      {(r.operation.holder || r.operation.empty) && (
+        <div style={{ margin: "10px 0" }}>
+          <b>🎯 操作建议</b>
+          {r.operation.holder && <div style={{ fontSize: 14 }}>💼 持仓者：{r.operation.holder}</div>}
+          {r.operation.empty && <div style={{ fontSize: 14 }}>🆕 空仓者：{r.operation.empty}</div>}
+        </div>
+      )}
+
+      {r.checklist.length > 0 && (
+        <div style={{ margin: "10px 0" }}>
+          <b>✅ 检查清单</b>
+          {r.checklist.map((c, i) => (
+            <div key={i} style={{ fontSize: 14 }}>
+              {checkIcon[c.status] || "•"} {c.item}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {r.data_limitations.length > 0 && (
+        <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+          ⚠️ 数据局限：{r.data_limitations.join("；")}
+        </p>
+      )}
+
+      <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+        数据完整度：
+        {Object.entries(data.availability)
+          .map(([k, v]) => `${k} ${availLabel[v] || v}`)
+          .join(" · ")}
+        <br />
+        模型 {data.model} · 生成于 {data.generated_at}
+      </p>
+    </div>
+  );
+}
+
+function AiList({ title, items, color }: { title: string; items: string[]; color?: string }) {
+  if (!items.length) return null;
+  return (
+    <div style={{ margin: "10px 0" }}>
+      <b>{title}</b>
+      <ul style={{ margin: "4px 0", paddingLeft: 20 }}>
+        {items.map((t, i) => (
+          <li key={i} style={{ fontSize: 14, color }}>
+            {t}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
